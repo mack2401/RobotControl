@@ -6,15 +6,24 @@ class AboutScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDark ? const Color(0xFF0B0F17) : const Color(0xFFFAF9FA);
+    final appBarBg = isDark ? const Color(0xFF0F172A) : const Color(0xE6FAF9FA);
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF1B1C1D);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF434653);
+    final dividerColor = isDark ? const Color(0xFF334155) : const Color(0xFFEFEDEE);
+    final specIconBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFEFEDEE);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9FA),
+      backgroundColor: scaffoldBg,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(64),
         child: Container(
-          decoration: const BoxDecoration(
-            color: Color(0xE6FAF9FA),
+          decoration: BoxDecoration(
+            color: appBarBg,
             boxShadow: [
-              BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 1)),
+              BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.04), blurRadius: 8, offset: const Offset(0, 1)),
             ],
           ),
           child: SafeArea(
@@ -34,7 +43,7 @@ class AboutScreen extends StatelessWidget {
                           width: 44,
                           height: 44,
                           decoration: const BoxDecoration(shape: BoxShape.circle),
-                          child: const Icon(Icons.arrow_back, size: 24, color: Color(0xFF1B1C1D)),
+                          child: Icon(Icons.arrow_back, size: 24, color: textPrimary),
                         ),
                       ),
                       Image.network(
@@ -55,13 +64,13 @@ class AboutScreen extends StatelessWidget {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Text(
+                        children: [
+                          const Text(
                             "iBots Remote",
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF094CB2),
+                              color: Color(0xFF38BDF8),
                               letterSpacing: 0.8,
                             ),
                           ),
@@ -70,7 +79,7 @@ class AboutScreen extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1B1C1D),
+                              color: textPrimary,
                             ),
                           ),
                         ],
@@ -110,10 +119,11 @@ class AboutScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardBg,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.transparent),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.04), blurRadius: 8, offset: const Offset(0, 2)),
                 ],
               ),
               child: Column(
@@ -126,19 +136,19 @@ class AboutScreen extends StatelessWidget {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD9E2FF),
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFD9E2FF),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(Icons.smart_toy, size: 32, color: Color(0xFF094CB2)),
+                      child: const Icon(Icons.smart_toy, size: 32, color: Color(0xFF38BDF8)),
                     ),
                   ),
                   const SizedBox(height: 18),
-                  const Text(
+                  Text(
                     "iBots Remote Controller",
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1B1C1D),
+                      color: textPrimary,
                       letterSpacing: -0.3,
                     ),
                   ),
@@ -146,8 +156,9 @@ class AboutScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD9E2FF).withOpacity(0.5),
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFD9E2FF).withOpacity(0.5),
                       borderRadius: BorderRadius.circular(9999),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.transparent),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -156,29 +167,29 @@ class AboutScreen extends StatelessWidget {
                           width: 6,
                           height: 6,
                           decoration: const BoxDecoration(
-                            color: Color(0xFF094CB2),
+                            color: Color(0xFF38BDF8),
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Text(
+                        Text(
                           "Version 1.0.0 (Build 2026.1)",
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF001946),
+                            color: isDark ? const Color(0xFF7DD3FC) : const Color(0xFF001946),
                           ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Text(
+                  Text(
                     "Control your smart devices and robotic car through an intuitive interface.",
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF434653),
+                      color: textSecondary,
                       height: 1.45,
                     ),
                   ),
@@ -192,10 +203,11 @@ class AboutScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardBg,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.transparent),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.04), blurRadius: 8, offset: const Offset(0, 2)),
                 ],
               ),
               child: Column(
@@ -204,18 +216,27 @@ class AboutScreen extends StatelessWidget {
                     Icons.memory,
                     "PLATFORM ARCHITECTURE",
                     "ESP32, Arduino & BLE/Wi-Fi",
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                    iconBg: specIconBg,
                   ),
-                  const Divider(height: 24, thickness: 1, color: Color(0xFFEFEDEE)),
+                  Divider(height: 24, thickness: 1, color: dividerColor),
                   _buildSpecRow(
                     Icons.smart_toy,
                     "ENGINEERING & DESIGN",
                     "iBots Robotics",
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                    iconBg: specIconBg,
                   ),
-                  const Divider(height: 24, thickness: 1, color: Color(0xFFEFEDEE)),
+                  Divider(height: 24, thickness: 1, color: dividerColor),
                   _buildSpecRow(
                     Icons.verified_user,
                     "FIRMWARE COMPATIBILITY",
                     "v2.4+ Ready & Synchronized",
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                    iconBg: specIconBg,
                   ),
                 ],
               ),
@@ -223,21 +244,21 @@ class AboutScreen extends StatelessWidget {
             const SizedBox(height: 24),
 
             // Minimal Brand & Legal Footer
-            const Text(
+            Text(
               "\"Unleash The Parts Of Electronics\"",
               style: TextStyle(
                 fontSize: 12,
                 fontStyle: FontStyle.italic,
-                color: Color(0xFF6D5E00),
+                color: isDark ? const Color(0xFFFBBF24) : const Color(0xFF6D5E00),
                 fontWeight: FontWeight.w500,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               "© 2026 iBots. All rights reserved.",
               style: TextStyle(
                 fontSize: 11,
-                color: Color(0xFF5A5F63),
+                color: textSecondary,
               ),
             ),
           ],
@@ -246,17 +267,24 @@ class AboutScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSpecRow(IconData icon, String subtitle, String title) {
+  Widget _buildSpecRow(
+    IconData icon,
+    String subtitle,
+    String title, {
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color iconBg,
+  }) {
     return Row(
       children: [
         Container(
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: const Color(0xFFEFEDEE),
+            color: iconBg,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, size: 20, color: const Color(0xFF094CB2)),
+          child: Icon(icon, size: 20, color: const Color(0xFF0284C7)),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -265,20 +293,20 @@ class AboutScreen extends StatelessWidget {
             children: [
               Text(
                 subtitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.8,
-                  color: Color(0xFF5A5F63),
+                  color: textSecondary,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF1B1C1D),
+                  color: textPrimary,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),

@@ -18,12 +18,21 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     required VoidCallback onProceed,
     required String proceedLabel,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF1B1C1D);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF434653);
+    final dismissBtnBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFEFEDEE);
+
     showDialog(
       context: context,
       builder: (dialogCtx) {
         return Dialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.transparent),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -36,19 +45,19 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD9E2FF),
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFD9E2FF),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(icon, size: 24, color: const Color(0xFF094CB2)),
+                      child: Icon(icon, size: 24, color: const Color(0xFF0284C7)),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1B1C1D),
+                          color: textPrimary,
                         ),
                       ),
                     ),
@@ -57,9 +66,9 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                 const SizedBox(height: 14),
                 Text(
                   description,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF434653),
+                    color: textSecondary,
                     height: 1.45,
                   ),
                 ),
@@ -69,9 +78,9 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          backgroundColor: const Color(0xFFEFEDEE),
-                          foregroundColor: const Color(0xFF1B1C1D),
-                          side: BorderSide.none,
+                          backgroundColor: dismissBtnBg,
+                          foregroundColor: textPrimary,
+                          side: BorderSide(color: isDark ? const Color(0xFF334155) : BorderSide.none.color),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
@@ -83,7 +92,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                     Expanded(
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF094CB2),
+                          backgroundColor: const Color(0xFF0284C7),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -107,15 +116,24 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDark ? const Color(0xFF0B0F17) : const Color(0xFFFAF9FA);
+    final appBarBg = isDark ? const Color(0xFF0F172A) : const Color(0xE6FAF9FA);
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF1B1C1D);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF434653);
+    final dividerColor = isDark ? const Color(0xFF334155) : const Color(0xFFEFEDEE);
+    final iconBoxBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFD9E2FF);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9FA),
+      backgroundColor: scaffoldBg,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(64),
         child: Container(
-          decoration: const BoxDecoration(
-            color: Color(0xE6FAF9FA),
+          decoration: BoxDecoration(
+            color: appBarBg,
             boxShadow: [
-              BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 1)),
+              BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.04), blurRadius: 8, offset: const Offset(0, 1)),
             ],
           ),
           child: SafeArea(
@@ -135,16 +153,16 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                           width: 44,
                           height: 44,
                           decoration: const BoxDecoration(shape: BoxShape.circle),
-                          child: const Icon(Icons.arrow_back, size: 24, color: Color(0xFF1B1C1D)),
+                          child: Icon(Icons.arrow_back, size: 24, color: textPrimary),
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Text(
+                      Text(
                         "Help & Support",
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1B1C1D),
+                          color: textPrimary,
                           letterSpacing: -0.3,
                         ),
                       ),
@@ -180,10 +198,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
           children: [
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardBg,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.transparent),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.04), blurRadius: 8, offset: const Offset(0, 2)),
                 ],
               ),
               clipBehavior: Clip.antiAlias,
@@ -217,30 +236,30 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                                   width: 48,
                                   height: 48,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFD9E2FF),
+                                    color: iconBoxBg,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: const Icon(Icons.menu_book, size: 24, color: Color(0xFF094CB2)),
+                                  child: const Icon(Icons.menu_book, size: 24, color: Color(0xFF0284C7)),
                                 ),
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: const [
+                                    children: [
                                       Text(
                                         "User Guide",
                                         style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.bold,
-                                          color: Color(0xFF1B1C1D),
+                                          color: textPrimary,
                                         ),
                                       ),
-                                      SizedBox(height: 2),
+                                      const SizedBox(height: 2),
                                       Text(
                                         "Learn how to operate and configure iBots controls",
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Color(0xFF434653),
+                                          color: textSecondary,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -251,12 +270,12 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                               ],
                             ),
                           ),
-                          const Icon(Icons.chevron_right, size: 20, color: Color(0xFFC3C6D5)),
+                          Icon(Icons.chevron_right, size: 20, color: textSecondary),
                         ],
                       ),
                     ),
                   ),
-                  const Divider(height: 1, thickness: 1, color: Color(0xFFEFEDEE)),
+                  Divider(height: 1, thickness: 1, color: dividerColor),
 
                   // Option 2: Contact Support
                   InkWell(
@@ -286,30 +305,30 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                                   width: 48,
                                   height: 48,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFD9E2FF),
+                                    color: iconBoxBg,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: const Icon(Icons.support_agent, size: 24, color: Color(0xFF094CB2)),
+                                  child: const Icon(Icons.support_agent, size: 24, color: Color(0xFF0284C7)),
                                 ),
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: const [
+                                    children: [
                                       Text(
                                         "Contact Support",
                                         style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.bold,
-                                          color: Color(0xFF1B1C1D),
+                                          color: textPrimary,
                                         ),
                                       ),
-                                      SizedBox(height: 2),
+                                      const SizedBox(height: 2),
                                       Text(
                                         "Get direct assistance from our engineering team",
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Color(0xFF434653),
+                                          color: textSecondary,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -320,7 +339,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                               ],
                             ),
                           ),
-                          const Icon(Icons.chevron_right, size: 20, color: Color(0xFFC3C6D5)),
+                          Icon(Icons.chevron_right, size: 20, color: textSecondary),
                         ],
                       ),
                     ),

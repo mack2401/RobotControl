@@ -14,6 +14,8 @@ class WifiConnectDialog {
     // Check if phone is already connected to this SSID
     await state.wifiService.refreshConnectedWifi();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: !isConnecting,
@@ -25,7 +27,11 @@ class WifiConnectDialog {
               (currentSsid == targetSsid || currentSsid.contains(targetSsid) || targetSsid.contains(currentSsid));
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.transparent),
+            ),
             titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -34,12 +40,16 @@ class WifiConnectDialog {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isAlreadyConnected ? const Color(0xFFECFDF5) : const Color(0xFFE0F2FE),
+                    color: isAlreadyConnected
+                        ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
+                        : (isDark ? const Color(0xFF0C4A6E) : const Color(0xFFE0F2FE)),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     net.isEspDevice ? Icons.smart_toy : Icons.wifi,
-                    color: isAlreadyConnected ? const Color(0xFF059669) : const Color(0xFF0284C7),
+                    color: isAlreadyConnected
+                        ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                        : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
                     size: 24,
                   ),
                 ),
@@ -50,13 +60,21 @@ class WifiConnectDialog {
                     children: [
                       Text(
                         net.ssid,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
                         "${net.securityLabel} • ${net.is5Ghz ? '5 GHz' : '2.4 GHz'} • ${net.level} dBm",
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontFamily: 'monospace'),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          fontFamily: 'monospace',
+                        ),
                       ),
                     ],
                   ),
@@ -73,26 +91,33 @@ class WifiConnectDialog {
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
+                        color: isDark ? const Color(0xFF451A03) : const Color(0xFFFEF3C7),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
+                        border: Border.all(color: isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.smart_toy, size: 18, color: Color(0xFFB45309)),
+                          Icon(Icons.smart_toy, size: 18, color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309)),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   "ESP32 Robot Access Point",
-                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                                  ),
                                 ),
                                 const SizedBox(height: 2),
-                                const Text(
+                                Text(
                                   "Default ESP password is usually '12345678'.",
-                                  style: TextStyle(fontSize: 10.5, color: Color(0xFFB45309)),
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
+                                  ),
                                 ),
                                 const SizedBox(height: 6),
                                 InkWell(
@@ -105,12 +130,16 @@ class WifiConnectDialog {
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFFDE68A),
+                                      color: isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
-                                    child: const Text(
+                                    child: Text(
                                       "Fill Default Password: 12345678",
-                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF78350F)),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? const Color(0xFFFEF3C7) : const Color(0xFF78350F),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -124,43 +153,55 @@ class WifiConnectDialog {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF5),
+                        color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFA7F3D0)),
+                        border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
                       ),
-                      child: const Column(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.check_circle, size: 18, color: Color(0xFF059669)),
-                              SizedBox(width: 8),
+                              const Icon(Icons.check_circle, size: 18, color: Color(0xFF10B981)),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   "Phone is connected to this Wi-Fi network!",
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF065F46)),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                          SizedBox(height: 6),
+                          const SizedBox(height: 6),
                           Text(
                             "Tap 'Link to Robot (192.168.4.1)' below to activate controller sockets and live commands.",
-                            style: TextStyle(fontSize: 11, color: Color(0xFF047857)),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                            ),
                           ),
                         ],
                       ),
                     )
                   else if (!net.isOpen) ...[
-                    const Text(
+                    Text(
                       "Enter Wi-Fi Password:",
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                      ),
                     ),
                     const SizedBox(height: 6),
                     TextField(
                       controller: passwordController,
                       obscureText: obscurePassword,
                       enabled: !isConnecting,
+                      style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A)),
                       onChanged: (_) {
                         if (validationError != null) {
                           setDialogState(() => validationError = null);
@@ -168,13 +209,13 @@ class WifiConnectDialog {
                       },
                       decoration: InputDecoration(
                         hintText: "Enter password",
-                        hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(Icons.lock_outline, size: 18, color: Color(0xFF64748B)),
+                        hintStyle: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                        prefixIcon: Icon(Icons.lock_outline, size: 18, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                         suffixIcon: IconButton(
                           icon: Icon(
                             obscurePassword ? Icons.visibility_off : Icons.visibility,
                             size: 18,
-                            color: const Color(0xFF64748B),
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                           ),
                           onPressed: () {
                             setDialogState(() {
@@ -183,12 +224,16 @@ class WifiConnectDialog {
                           },
                         ),
                         filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         errorText: validationError,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -202,22 +247,26 @@ class WifiConnectDialog {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
+                        color: isDark ? const Color(0xFF0C4A6E).withAlpha(160) : const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                        border: Border.all(color: isDark ? const Color(0xFF0284C7) : const Color(0xFFBFDBFE)),
                       ),
                       child: Row(
                         children: [
                           const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               statusMessage ?? "Connecting... Confirm prompt on screen.",
-                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? const Color(0xFFBAE6FD) : const Color(0xFF1D4ED8),
+                              ),
                             ),
                           ),
                         ],
@@ -229,7 +278,7 @@ class WifiConnectDialog {
             actions: [
               TextButton(
                 onPressed: isConnecting ? null : () => Navigator.of(ctx).pop(false),
-                child: const Text("Cancel", style: TextStyle(color: Color(0xFF64748B))),
+                child: Text("Cancel", style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
               ),
               OutlinedButton.icon(
                 icon: const Icon(Icons.tune, size: 14),

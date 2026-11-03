@@ -27,6 +27,16 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
 
   final TextEditingController _cameraIpController = TextEditingController(text: '192.168.1.184');
 
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get scaffoldBg => isDark ? const Color(0xFF0B0F17) : const Color(0xFFFAF9FA);
+  Color get appBarBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFFAF9FA);
+  Color get cardBg => isDark ? const Color(0xFF1E293B) : Colors.white;
+  Color get cardBorder => isDark ? const Color(0xFF334155) : const Color(0xFFC3C6D5).withOpacity(0.3);
+  Color get textPrimary => isDark ? Colors.white : const Color(0xFF1B1C1D);
+  Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF5A5F63);
+  Color get subBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFFAF9FA);
+  Color get chipBg => isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+
   String _currentTimestamp() {
     final now = DateTime.now();
     final h = now.hour.toString().padLeft(2, '0');
@@ -187,7 +197,7 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
   void _showResolutionModal() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -201,16 +211,16 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Stream Resolution',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1B1C1D),
+                      color: textPrimary,
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, size: 20, color: Color(0xFF64748B)),
+                    icon: Icon(Icons.close, size: 20, color: textSecondary),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
@@ -249,16 +259,18 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+          color: isSelected
+              ? (isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : const Color(0xFFEFF6FF))
+              : cardBg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0),
+            color: isSelected ? const Color(0xFF0284C7) : cardBorder,
             width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF64748B)),
+            Icon(icon, size: 22, color: isSelected ? const Color(0xFF0284C7) : textSecondary),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -269,12 +281,12 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF0F172A),
+                      color: isSelected ? const Color(0xFF0284C7) : textPrimary,
                     ),
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    style: TextStyle(fontSize: 11, color: textSecondary),
                   ),
                 ],
               ),
@@ -299,10 +311,10 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
     final isStreamActive = activeMode == 'ROUTER' || apStatus == ApHotspotState.connected;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9FA),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: const Color(0xFFFAF9FA).withOpacity(0.95),
+        backgroundColor: appBarBg.withOpacity(0.95),
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
           child: InkWell(
@@ -311,22 +323,23 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                color: Colors.white,
+                color: cardBg,
+                border: Border.all(color: cardBorder),
                 boxShadow: [
                   BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6),
                 ],
               ),
-              child: const Icon(Icons.arrow_back, size: 20, color: Color(0xFF1B1C1D)),
+              child: Icon(Icons.arrow_back, size: 20, color: textPrimary),
             ),
           ),
         ),
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Flexible(
+            Flexible(
               child: Text(
                 'ESP32 CAM',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1B1C1D)),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textPrimary),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -341,16 +354,16 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE9E8E9),
+                  color: chipBg,
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.photo_library, size: 14, color: Color(0xFF094CB2)),
-                    SizedBox(width: 4),
+                    const Icon(Icons.photo_library, size: 14, color: Color(0xFF094CB2)),
+                    const SizedBox(width: 4),
                     Text(
                       'Gallery',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF1B1C1D)),
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: textPrimary),
                     ),
                   ],
                 ),
@@ -360,7 +373,7 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.restart_alt, size: 18, color: Color(0xFF1B1C1D)),
+            icon: Icon(Icons.restart_alt, size: 18, color: textPrimary),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Resetting camera stream...')),
@@ -390,9 +403,9 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFC3C6D5).withOpacity(0.3)),
+                  border: Border.all(color: cardBorder),
                   boxShadow: [
                     BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8),
                   ],
@@ -415,7 +428,7 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                               Icon(
                                 Icons.wifi_tethering,
                                 size: 16,
-                                color: activeMode == 'AP' ? Colors.white : const Color(0xFF434653),
+                                color: activeMode == 'AP' ? Colors.white : textSecondary,
                               ),
                               const SizedBox(width: 6),
                               Text(
@@ -423,7 +436,7 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: activeMode == 'AP' ? Colors.white : const Color(0xFF434653),
+                                  color: activeMode == 'AP' ? Colors.white : textSecondary,
                                 ),
                               ),
                             ],
@@ -447,7 +460,7 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                               Icon(
                                 Icons.router,
                                 size: 16,
-                                color: activeMode == 'ROUTER' ? Colors.white : const Color(0xFF434653),
+                                color: activeMode == 'ROUTER' ? Colors.white : textSecondary,
                               ),
                               const SizedBox(width: 6),
                               Text(
@@ -455,7 +468,7 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: activeMode == 'ROUTER' ? Colors.white : const Color(0xFF434653),
+                                  color: activeMode == 'ROUTER' ? Colors.white : textSecondary,
                                 ),
                               ),
                             ],
@@ -474,9 +487,9 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardBg,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFC3C6D5).withOpacity(0.3)),
+                    border: Border.all(color: cardBorder),
                     boxShadow: [
                       BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8),
                     ],
@@ -493,28 +506,32 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                                 children: [
                                   const Icon(Icons.sensors, size: 16, color: Color(0xFF094CB2)),
                                   const SizedBox(width: 6),
-                                  const Text(
+                                  Text(
                                     'ESP32 Hotspot Mode',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1B1C1D)),
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary),
                                   ),
                                   const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFD9E2FF),
+                                      color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFD9E2FF),
                                       borderRadius: BorderRadius.circular(999),
                                     ),
-                                    child: const Text(
+                                    child: Text(
                                       'Direct Connect',
-                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF001946)),
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF001946),
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 2),
-                              const Text(
+                              Text(
                                 'SSID: ESP32-CAM-AP • Default IP: 192.168.4.1',
-                                style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: Color(0xFF5A5F63)),
+                                style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textSecondary),
                               ),
                             ],
                           ),
@@ -522,10 +539,10 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               color: apStatus == ApHotspotState.connected
-                                  ? const Color(0xFFD1FAE5)
+                                  ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5))
                                   : apStatus == ApHotspotState.connecting
-                                      ? const Color(0xFFFEF3C7)
-                                      : const Color(0xFFF1F5F9),
+                                      ? (isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7))
+                                      : chipBg,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Row(
@@ -537,7 +554,7 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                                       ? const Color(0xFF10B981)
                                       : apStatus == ApHotspotState.connecting
                                           ? const Color(0xFFF59E0B)
-                                          : const Color(0xFF94A3B8),
+                                          : textSecondary,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -550,10 +567,10 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                     color: apStatus == ApHotspotState.connected
-                                        ? const Color(0xFF065F46)
+                                        ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46))
                                         : apStatus == ApHotspotState.connecting
-                                            ? const Color(0xFF92400E)
-                                            : const Color(0xFF64748B),
+                                            ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E))
+                                            : textSecondary,
                                   ),
                                 ),
                               ],
@@ -575,7 +592,7 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                                       ? const Color(0xFF094CB2)
                                       : apStatus == ApHotspotState.connecting
                                           ? const Color(0xFF0369A1)
-                                          : const Color(0xFF0F172A),
+                                          : (isDark ? const Color(0xFF2563EB) : const Color(0xFF0F172A)),
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
@@ -633,9 +650,9 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFEE2E2),
+                                  color: isDark ? const Color(0xFF7F1D1D).withOpacity(0.3) : const Color(0xFFFEE2E2),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFFFECACA)),
+                                  border: Border.all(color: isDark ? const Color(0xFFEF4444).withOpacity(0.4) : const Color(0xFFFECACA)),
                                 ),
                                 child: const Row(
                                   children: [
@@ -657,10 +674,10 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                                 width: 38,
                                 height: 38,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F5F9),
+                                  color: chipBg,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: const Icon(Icons.refresh, size: 18, color: Color(0xFF475569)),
+                                child: Icon(Icons.refresh, size: 18, color: textSecondary),
                               ),
                             ),
                         ],
@@ -673,9 +690,9 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardBg,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFC3C6D5).withOpacity(0.3)),
+                    border: Border.all(color: cardBorder),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -687,49 +704,49 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                             children: [
                               const Icon(Icons.lan, size: 16, color: Color(0xFF094CB2)),
                               const SizedBox(width: 6),
-                              const Text('Common Wi-Fi Network', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              Text('Common Wi-Fi Network', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary)),
                               const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFDFE3E8),
+                                  color: chipBg,
                                   borderRadius: BorderRadius.circular(999),
                                 ),
-                                child: const Text('STA Mode', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                                child: Text('STA Mode', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: textPrimary)),
                               ),
                             ],
                           ),
-                          const Text('Port :81', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: Color(0xFF5A5F63))),
+                          Text('Port :81', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textSecondary)),
                         ],
                       ),
                       const SizedBox(height: 10),
-                      const Text('Camera IP Address', style: TextStyle(fontSize: 11, color: Color(0xFF5A5F63))),
+                      Text('Camera IP Address', style: TextStyle(fontSize: 11, color: textSecondary)),
                       const SizedBox(height: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFAF9FA),
+                          color: subBg,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFC3C6D5).withOpacity(0.6)),
+                          border: Border.all(color: cardBorder),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.videocam, size: 16, color: Color(0xFF5A5F63)),
+                            Icon(Icons.videocam, size: 16, color: textSecondary),
                             const SizedBox(width: 8),
                             Expanded(
                               child: TextField(
                                 controller: _cameraIpController,
-                                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                                style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: textPrimary),
                                 decoration: const InputDecoration(border: InputBorder.none, isDense: true),
                               ),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFEFEDEE),
+                                color: chipBg,
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: const Text(':81/stream', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: Color(0xFF5A5F63))),
+                              child: Text(':81/stream', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textSecondary)),
                             ),
                           ],
                         ),
@@ -1041,10 +1058,12 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: isPaused ? const Color(0xFFFEF3C7) : Colors.white,
+                          color: isPaused
+                              ? (isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7))
+                              : cardBg,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isPaused ? const Color(0xFFF59E0B) : const Color(0xFFC3C6D5).withOpacity(0.4),
+                            color: isPaused ? const Color(0xFFF59E0B) : cardBorder,
                           ),
                           boxShadow: [
                             BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4),
@@ -1064,7 +1083,9 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: isPaused ? const Color(0xFFB45309) : const Color(0xFF1B1C1D),
+                                color: isPaused
+                                    ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
+                                    : textPrimary,
                               ),
                             ),
                           ],
@@ -1081,10 +1102,12 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: isRecording ? const Color(0xFFFEE2E2) : Colors.white,
+                          color: isRecording
+                              ? (isDark ? const Color(0xFF7F1D1D).withOpacity(0.4) : const Color(0xFFFEE2E2))
+                              : cardBg,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isRecording ? const Color(0xFFEF4444) : const Color(0xFFC3C6D5).withOpacity(0.4),
+                            color: isRecording ? const Color(0xFFEF4444) : cardBorder,
                           ),
                         ),
                         child: Row(
@@ -1104,7 +1127,9 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: isRecording ? const Color(0xFFDC2626) : const Color(0xFF1B1C1D),
+                                color: isRecording
+                                    ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626))
+                                    : textPrimary,
                               ),
                             ),
                           ],
@@ -1121,16 +1146,16 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: cardBg,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFC3C6D5).withOpacity(0.4)),
+                          border: Border.all(color: cardBorder),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.photo_camera, size: 16, color: Color(0xFF094CB2)),
-                            SizedBox(width: 4),
-                            Text('Snap', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            const Icon(Icons.photo_camera, size: 16, color: Color(0xFF094CB2)),
+                            const SizedBox(width: 4),
+                            Text('Snap', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textPrimary)),
                           ],
                         ),
                       ),
@@ -1171,9 +1196,9 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFC3C6D5).withOpacity(0.3)),
+                  border: Border.all(color: cardBorder),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1185,16 +1210,18 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                           height: 8,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: isStreamActive ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                            color: isStreamActive ? const Color(0xFF10B981) : textSecondary,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Text('Connection:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                        Text('Connection:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textPrimary)),
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: isStreamActive ? const Color(0xFFD1FAE5) : const Color(0xFFF1F5F9),
+                            color: isStreamActive
+                                ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5))
+                                : chipBg,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
@@ -1202,7 +1229,9 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
-                              color: isStreamActive ? const Color(0xFF065F46) : const Color(0xFF64748B),
+                              color: isStreamActive
+                                  ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46))
+                                  : textSecondary,
                             ),
                           ),
                         ),
@@ -1214,17 +1243,17 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                         const SizedBox(width: 4),
                         Text(
                           isStreamActive ? '38ms' : '--',
-                          style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFF5A5F63)),
+                          style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: textSecondary),
                         ),
                         const SizedBox(width: 6),
-                        const Text('•', style: TextStyle(color: Color(0xFF5A5F63))),
+                        Text('•', style: TextStyle(color: textSecondary)),
                         const SizedBox(width: 6),
                         Text(
                           isStreamActive ? '0% loss' : 'No signal',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: isStreamActive ? const Color(0xFF065F46) : const Color(0xFF64748B),
+                            color: isStreamActive ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46)) : textSecondary,
                           ),
                         ),
                       ],
@@ -1238,9 +1267,9 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFC3C6D5).withOpacity(0.3)),
+                  border: Border.all(color: cardBorder),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1251,7 +1280,7 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                           width: 34,
                           height: 34,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEFEDEE),
+                            color: chipBg,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(Icons.wifi_channel, size: 18, color: Color(0xFF094CB2)),
@@ -1262,13 +1291,13 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                           children: [
                             Text(
                               activeMode == 'AP' ? 'Access Point Stream (AP)' : 'Router Stream (STA)',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1B1C1D)),
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary),
                             ),
                             Text(
                               activeMode == 'AP'
                                   ? 'http://192.168.4.1:81/stream'
                                   : 'http://${_cameraIpController.text}:81/stream',
-                              style: const TextStyle(fontFamily: 'monospace', fontSize: 10, color: Color(0xFF5A5F63)),
+                              style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textSecondary),
                             ),
                           ],
                         ),
@@ -1277,7 +1306,9 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: isStreamActive ? const Color(0xFFD1FAE5) : const Color(0xFFF1F5F9),
+                        color: isStreamActive
+                            ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5))
+                            : chipBg,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -1285,7 +1316,9 @@ class _Esp32CamScreenState extends State<Esp32CamScreen> {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: isStreamActive ? const Color(0xFF065F46) : const Color(0xFF64748B),
+                          color: isStreamActive
+                              ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46))
+                              : textSecondary,
                         ),
                       ),
                     ),

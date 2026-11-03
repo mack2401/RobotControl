@@ -43,6 +43,8 @@ class DeviceProfile {
     );
   }
 
+  bool get isRobotDevice => toRoboticDevice().isRobotDevice;
+
   factory DeviceProfile.fromRoboticDevice(RoboticDevice device) {
     return DeviceProfile(
       id: device.id,
@@ -106,61 +108,9 @@ class DeviceProfileDatabase {
   static final DeviceProfileDatabase _instance = DeviceProfileDatabase._internal();
   factory DeviceProfileDatabase() => _instance;
 
-  DeviceProfileDatabase._internal() {
-    _initPreseededProfiles();
-  }
+  DeviceProfileDatabase._internal();
 
   final List<DeviceProfile> _profiles = [];
-
-  void _initPreseededProfiles() {
-    final now = DateTime.now();
-    _profiles.addAll([
-      DeviceProfile(
-        id: "ibt-4899",
-        name: "iBots Rover ESP32-WROOM",
-        macAddress: "24:6F:28:B2:1A:40",
-        ipAddress: "192.168.4.1",
-        protocol: "BLE 5.2",
-        deviceType: "Rover",
-        lastConnected: now.subtract(const Duration(minutes: 15)),
-        rssi: -54,
-        isPaired: true,
-      ),
-      DeviceProfile(
-        id: "ibt-classic-01",
-        name: "iBots Mecanum 4WD (Classic)",
-        macAddress: "00:1A:7D:DA:71:13",
-        ipAddress: "192.168.4.10",
-        protocol: "Bluetooth (Classic)",
-        deviceType: "Rover",
-        lastConnected: now.subtract(const Duration(hours: 3)),
-        rssi: -48,
-        isPaired: true,
-      ),
-      DeviceProfile(
-        id: "ibt-cam-02",
-        name: "iBots ESP32-CAM Streamer",
-        macAddress: "30:AE:A4:07:0C:88",
-        ipAddress: "192.168.4.2",
-        protocol: "Wi-Fi AP",
-        deviceType: "Cam",
-        lastConnected: now.subtract(const Duration(days: 1)),
-        rssi: -62,
-        isPaired: true,
-      ),
-      DeviceProfile(
-        id: "ibt-arm-06",
-        name: "iBots 6-DOF Robotic Arm",
-        macAddress: "A4:CF:12:D5:78:10",
-        ipAddress: "192.168.4.3",
-        protocol: "BLE 5.2",
-        deviceType: "Arm",
-        lastConnected: now.subtract(const Duration(days: 3)),
-        rssi: -71,
-        isPaired: true,
-      ),
-    ]);
-  }
 
   Future<List<DeviceProfile>> getAllProfiles() async {
     return List.unmodifiable(_profiles);
@@ -179,7 +129,12 @@ class DeviceProfileDatabase {
   }
 
   Future<void> saveProfile(DeviceProfile profile) async {
-    final index = _profiles.indexWhere((p) => p.id == profile.id || p.macAddress == profile.macAddress);
+    final index = _profiles.indexWhere((p) =>
+        p.id == profile.id ||
+        (profile.macAddress.isNotEmpty &&
+            profile.macAddress != "00:00:00:00:00:00" &&
+            p.macAddress.toLowerCase() == profile.macAddress.toLowerCase()) ||
+        (p.name.toLowerCase() == profile.name.toLowerCase() && p.protocol == profile.protocol));
     if (index >= 0) {
       _profiles[index] = profile;
     } else {

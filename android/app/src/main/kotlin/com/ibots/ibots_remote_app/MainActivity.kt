@@ -17,6 +17,7 @@ import android.net.wifi.ScanResult
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
 import android.net.wifi.WifiNetworkSuggestion
+import android.location.LocationManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -43,6 +44,7 @@ class MainActivity: FlutterActivity() {
     private var tcpWriter: java.io.OutputStreamWriter? = null
     private var tcpHost: String? = null
     private var tcpPort: Int = 8080
+    private var lastWorkingFormat: String? = null
 
     private fun startSensors() {
         if (sensorManager == null) {
@@ -302,6 +304,61 @@ class MainActivity: FlutterActivity() {
                     result.success(wifiManager?.isWifiEnabled ?: false)
                 }
 
+                "isLocationEnabled" -> {
+                    val lm = applicationContext.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+                    var locEnabled = false
+                    if (lm != null) {
+                        locEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            lm.isLocationEnabled
+                        } else {
+                            @Suppress("DEPRECATION")
+                            lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+                        }
+                    }
+                    result.success(locEnabled)
+                }
+
+                "openLocationSettings" -> {
+                    try {
+                        val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
+                }
+
+                "getPhoneSavedWifiNetworks" -> {
+                    val list = mutableListOf<Map<String, Any>>()
+                    if (wifiManager != null) {
+                        try {
+                            @Suppress("DEPRECATION")
+                            val configs = wifiManager.configuredNetworks
+                            android.util.Log.d("MainActivity", "wifiManager.configuredNetworks count: ${configs?.size}")
+                            if (configs != null) {
+                                for (config in configs) {
+                                    var s = config.SSID ?: ""
+                                    if (s.startsWith("\"") && s.endsWith("\"") && s.length >= 2) {
+                                        s = s.substring(1, s.length - 1)
+                                    }
+                                    if (s.isNotEmpty() && s != "<unknown ssid>") {
+                                        list.add(hashMapOf(
+                                            "ssid" to s,
+                                            "bssid" to (config.BSSID ?: ""),
+                                            "networkId" to config.networkId
+                                        ))
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("MainActivity", "Error getting configuredNetworks: ${e.message}")
+                        }
+                    }
+                    result.success(list)
+                }
+
                 "openWifiSettings" -> {
                     try {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -479,15 +536,46 @@ class MainActivity: FlutterActivity() {
                 "connectTcp" -> {
                     val host = call.argument<String>("host") ?: "192.168.4.1"
                     val port = call.argument<Int>("port") ?: 8080
-                    Thread {
-                        val writer = getOrConnectTcp(connectivityManager, host, port)
-                        runOnUiThread {
-                            result.success(writer != null)
-                        }
-                    }.start()
+                    if (port == 80) {
+                        // Port 80 is HTTP REST WebServer. DO NOT open a persistent TCP socket!
+                        // A raw TCP socket on port 80 blocks the ESP32 WebServer client slot.
+                        Thread {
+                            var reachable = false
+                            try {
+                                val url = java.net.URL("http://$host:$port/")
+                                val conn = url.openConnection() as java.net.HttpURLConnection
+                                conn.connectTimeout = 1200
+                                conn.readTimeout = 1200
+                                conn.requestMethod = "GET"
+                                conn.setRequestProperty("Connection", "close")
+                                val code = conn.responseCode
+                                try { conn.inputStream?.close() } catch (_: Exception) {}
+                                conn.disconnect()
+                                reachable = (code in 200..499)
+                            } catch (e: Exception) {
+                                try {
+                                    val pingSock = java.net.Socket()
+                                    pingSock.connect(java.net.InetSocketAddress(host, port), 800)
+                                    pingSock.close()
+                                    reachable = true
+                                } catch (_: Exception) {}
+                            }
+                            runOnUiThread {
+                                result.success(reachable)
+                            }
+                        }.start()
+                    } else {
+                        Thread {
+                            val writer = getOrConnectTcp(connectivityManager, host, port)
+                            runOnUiThread {
+                                result.success(writer != null)
+                            }
+                        }.start()
+                    }
                 }
 
                 "disconnectTcp" -> {
+                    lastWorkingFormat = null
                     closeTcp()
                     result.success(true)
                 }
@@ -500,32 +588,10 @@ class MainActivity: FlutterActivity() {
 
                     Thread {
                         var sent = false
-                        // 1. Persistent TCP writer (no connection teardown, keeps ESP8266 client connected!)
-                        try {
-                            val writer = getOrConnectTcp(connectivityManager, host, port)
-                            if (writer != null) {
-                                writer.write(cmd)
-                                writer.flush()
-                                sent = true
-                                android.util.Log.d("MainActivity", "Sent TCP cmd '$cmd' to $host:$port")
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.w("MainActivity", "Write error, retrying connect: ${e.message}")
-                            closeTcp()
-                            try {
-                                val writer = getOrConnectTcp(connectivityManager, host, port)
-                                if (writer != null) {
-                                    writer.write(cmd)
-                                    writer.flush()
-                                    sent = true
-                                }
-                            } catch (ex: Exception) {
-                                android.util.Log.e("MainActivity", "Retry failed: ${ex.message}")
-                            }
-                        }
+                        val trimmedCmd = cmd.trim()
 
-                        // 2. Also send HTTP GET if raw TCP didn't succeed and port is 80
-                        if (!sent && port == 80) {
+                        // Priority 1: If port is 80 (HTTP WebServer), send HTTP GET request
+                        if (port == 80) {
                             var wifiNetwork: Network? = null
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && connectivityManager != null) {
                                 for (net in connectivityManager.allNetworks) {
@@ -536,21 +602,124 @@ class MainActivity: FlutterActivity() {
                                     }
                                 }
                             }
-                            try {
-                                val encodedVal = java.net.URLEncoder.encode(cmd.trim(), "UTF-8")
-                                val url = java.net.URL("http://$host:$port$path$encodedVal")
-                                val conn = if (wifiNetwork != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                                    wifiNetwork.openConnection(url) as java.net.HttpURLConnection
-                                } else {
-                                    url.openConnection() as java.net.HttpURLConnection
+
+                            // Build candidate URLs paired with format keys for learning/caching
+                            val candidates = mutableListOf<Pair<String, String>>()
+                            val encodedVal = java.net.URLEncoder.encode(trimmedCmd, "UTF-8")
+                            val upper = trimmedCmd.uppercase()
+                            val lower = trimmedCmd.lowercase()
+
+                            // Word / Direct candidates
+                            candidates.add(Pair("http://$host:$port/$trimmedCmd", "DIRECT_WORD"))
+                            candidates.add(Pair("http://$host:$port/$lower", "DIRECT_LOWER"))
+                            candidates.add(Pair("http://$host:$port$path$encodedVal", "QUERY_CMD"))
+
+                            when (upper) {
+                                "F", "1", "FORWARD" -> {
+                                    candidates.add(Pair("http://$host:$port/forward", "DIRECT_LOWER"))
+                                    candidates.add(Pair("http://$host:$port/FORWARD", "DIRECT_WORD"))
+                                    candidates.add(Pair("http://$host:$port/F", "DIRECT_CHAR"))
+                                    candidates.add(Pair("http://$host:$port/action?go=forward", "ACTION_GO"))
+                                    candidates.add(Pair("http://$host:$port/?State=FORWARD", "STATE_WORD"))
+                                    candidates.add(Pair("http://$host:$port/?State=F", "STATE_CHAR"))
                                 }
-                                conn.connectTimeout = 800
-                                conn.readTimeout = 800
-                                conn.requestMethod = "GET"
-                                conn.responseCode
-                                conn.disconnect()
-                                sent = true
-                            } catch (_: Exception) {}
+                                "B", "2", "BACKWARD" -> {
+                                    candidates.add(Pair("http://$host:$port/backward", "DIRECT_LOWER"))
+                                    candidates.add(Pair("http://$host:$port/BACKWARD", "DIRECT_WORD"))
+                                    candidates.add(Pair("http://$host:$port/B", "DIRECT_CHAR"))
+                                    candidates.add(Pair("http://$host:$port/action?go=backward", "ACTION_GO"))
+                                    candidates.add(Pair("http://$host:$port/?State=BACKWARD", "STATE_WORD"))
+                                    candidates.add(Pair("http://$host:$port/?State=B", "STATE_CHAR"))
+                                }
+                                "L", "3", "LEFT" -> {
+                                    candidates.add(Pair("http://$host:$port/left", "DIRECT_LOWER"))
+                                    candidates.add(Pair("http://$host:$port/LEFT", "DIRECT_WORD"))
+                                    candidates.add(Pair("http://$host:$port/L", "DIRECT_CHAR"))
+                                    candidates.add(Pair("http://$host:$port/action?go=left", "ACTION_GO"))
+                                    candidates.add(Pair("http://$host:$port/?State=LEFT", "STATE_WORD"))
+                                    candidates.add(Pair("http://$host:$port/?State=L", "STATE_CHAR"))
+                                }
+                                "R", "4", "RIGHT" -> {
+                                    candidates.add(Pair("http://$host:$port/right", "DIRECT_LOWER"))
+                                    candidates.add(Pair("http://$host:$port/RIGHT", "DIRECT_WORD"))
+                                    candidates.add(Pair("http://$host:$port/R", "DIRECT_CHAR"))
+                                    candidates.add(Pair("http://$host:$port/action?go=right", "ACTION_GO"))
+                                    candidates.add(Pair("http://$host:$port/?State=RIGHT", "STATE_WORD"))
+                                    candidates.add(Pair("http://$host:$port/?State=R", "STATE_CHAR"))
+                                }
+                                "S", "0", "STOP" -> {
+                                    candidates.add(Pair("http://$host:$port/stop", "DIRECT_LOWER"))
+                                    candidates.add(Pair("http://$host:$port/STOP", "DIRECT_WORD"))
+                                    candidates.add(Pair("http://$host:$port/S", "DIRECT_CHAR"))
+                                    candidates.add(Pair("http://$host:$port/action?go=stop", "ACTION_GO"))
+                                    candidates.add(Pair("http://$host:$port/?State=STOP", "STATE_WORD"))
+                                    candidates.add(Pair("http://$host:$port/?State=S", "STATE_CHAR"))
+                                }
+                            }
+
+                            // If we know which format worked previously, prioritize it first!
+                            val orderedCandidates = if (lastWorkingFormat != null) {
+                                val priority = candidates.filter { it.second == lastWorkingFormat }
+                                val rest = candidates.filter { it.second != lastWorkingFormat }
+                                priority + rest
+                            } else {
+                                candidates
+                            }
+
+                            for ((urlStr, formatKey) in orderedCandidates) {
+                                try {
+                                    val url = java.net.URL(urlStr)
+                                    val conn = if (wifiNetwork != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                        wifiNetwork.openConnection(url) as java.net.HttpURLConnection
+                                    } else {
+                                        url.openConnection() as java.net.HttpURLConnection
+                                    }
+                                    conn.connectTimeout = 400
+                                    conn.readTimeout = 400
+                                    conn.requestMethod = "GET"
+                                    conn.setRequestProperty("Connection", "close")
+                                    val responseCode = conn.responseCode
+                                    try {
+                                        conn.inputStream?.close()
+                                    } catch (_: Exception) {}
+                                    conn.disconnect()
+                                    if (responseCode in 200..299) {
+                                        sent = true
+                                        lastWorkingFormat = formatKey
+                                        android.util.Log.d("MainActivity", "Sent HTTP GET to $urlStr (status $responseCode, format $formatKey)")
+                                        break
+                                    }
+                                } catch (e: Exception) {
+                                    // Try next candidate endpoint
+                                }
+                            }
+                        }
+
+                        // Priority 2: Persistent TCP writer for socket servers (port 8080 or TCP fallback)
+                        // CRITICAL: NEVER open persistent raw TCP socket on port 80, as it locks up the ESP32 WebServer!
+                        if (!sent && port != 80) {
+                            try {
+                                val writer = getOrConnectTcp(connectivityManager, host, port)
+                                if (writer != null) {
+                                    writer.write(cmd)
+                                    writer.flush()
+                                    sent = true
+                                    android.util.Log.d("MainActivity", "Sent TCP cmd '$cmd' to $host:$port")
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.w("MainActivity", "Write error, retrying connect: ${e.message}")
+                                closeTcp()
+                                try {
+                                    val writer = getOrConnectTcp(connectivityManager, host, port)
+                                    if (writer != null) {
+                                        writer.write(cmd)
+                                        writer.flush()
+                                        sent = true
+                                    }
+                                } catch (ex: Exception) {
+                                    android.util.Log.e("MainActivity", "Retry failed: ${ex.message}")
+                                }
+                            }
                         }
 
                         runOnUiThread {
@@ -560,6 +729,7 @@ class MainActivity: FlutterActivity() {
                 }
 
                 "disconnectWifi" -> {
+                    lastWorkingFormat = null
                     closeTcp()
                     activeNetworkCallback?.let {
                         try {
@@ -578,47 +748,110 @@ class MainActivity: FlutterActivity() {
                         result.success(null)
                         return@setMethodCallHandler
                     }
-                    val info = wifiManager.connectionInfo
-                    if (info == null || info.networkId == -1) {
-                        result.success(null)
-                        return@setMethodCallHandler
+                    var ssid = ""
+                    var bssid = ""
+                    var rssi = -50
+                    var linkSpeed = 0
+                    var frequency = 2400
+
+                    // 1. On Android 10+ (Q+), modern WifiInfo is acquired through ConnectivityManager & NetworkCapabilities
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && connectivityManager != null) {
+                        for (net in connectivityManager.allNetworks) {
+                            val caps = connectivityManager.getNetworkCapabilities(net)
+                            if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                                val info = caps.transportInfo as? android.net.wifi.WifiInfo
+                                if (info != null) {
+                                    val s = info.ssid ?: ""
+                                    if (s.isNotEmpty() && s != "<unknown ssid>") {
+                                        ssid = s
+                                        bssid = info.bssid ?: ""
+                                        rssi = info.rssi
+                                        linkSpeed = info.linkSpeed
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                            frequency = info.frequency
+                                        }
+                                        break
+                                    }
+                                }
+                            }
+                        }
                     }
-                    var ssid = info.ssid ?: ""
+
+                    // 2. Legacy fallback
+                    val legacyInfo = wifiManager.connectionInfo
+                    if (legacyInfo != null) {
+                        if (ssid.isEmpty() || ssid == "<unknown ssid>") {
+                            ssid = legacyInfo.ssid ?: ""
+                        }
+                        if (bssid.isEmpty()) bssid = legacyInfo.bssid ?: ""
+                        if (rssi == -50) rssi = legacyInfo.rssi
+                        if (linkSpeed == 0) linkSpeed = legacyInfo.linkSpeed
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && frequency == 2400) {
+                            frequency = legacyInfo.frequency
+                        }
+                    }
+
                     if (ssid.startsWith("\"") && ssid.endsWith("\"") && ssid.length >= 2) {
                         ssid = ssid.substring(1, ssid.length - 1)
                     }
-                    if (ssid == "<unknown ssid>" || ssid.isEmpty()) {
+
+                    // Try dhcpInfo first
+                    var ipStr = "0.0.0.0"
+                    var gatewayStr = "192.168.4.1"
+
+                    val dhcp = wifiManager.dhcpInfo
+                    if (dhcp != null && dhcp.ipAddress != 0) {
+                        val ipInt = dhcp.ipAddress
+                        ipStr = String.format("%d.%d.%d.%d", ipInt and 0xff, ipInt shr 8 and 0xff, ipInt shr 16 and 0xff, ipInt shr 24 and 0xff)
+                    } else if (legacyInfo != null && legacyInfo.ipAddress != 0) {
+                        val ipInt = legacyInfo.ipAddress
+                        ipStr = String.format("%d.%d.%d.%d", ipInt and 0xff, ipInt shr 8 and 0xff, ipInt shr 16 and 0xff, ipInt shr 24 and 0xff)
+                    }
+
+                    if (dhcp != null && dhcp.gateway != 0) {
+                        val gatewayInt = dhcp.gateway
+                        gatewayStr = String.format("%d.%d.%d.%d", gatewayInt and 0xff, gatewayInt shr 8 and 0xff, gatewayInt shr 16 and 0xff, gatewayInt shr 24 and 0xff)
+                    }
+
+                    // If IP is still 0.0.0.0, find wlan0 network interface
+                    if (ipStr == "0.0.0.0") {
+                        try {
+                            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+                            while (interfaces.hasMoreElements()) {
+                                val iface = interfaces.nextElement()
+                                if (iface.name.startsWith("wlan") || iface.name.startsWith("ap")) {
+                                    val addrs = iface.inetAddresses
+                                    while (addrs.hasMoreElements()) {
+                                        val addr = addrs.nextElement()
+                                        if (!addr.isLoopbackAddress && addr is java.net.Inet4Address) {
+                                            ipStr = addr.hostAddress ?: "0.0.0.0"
+                                            break
+                                        }
+                                    }
+                                }
+                                if (ipStr != "0.0.0.0") break
+                            }
+                        } catch (_: Exception) {}
+                    }
+
+                    // If phone is connected to Wi-Fi (IP is assigned) but SSID was restricted by OS, give a recognizable name based on gateway
+                    if ((ssid.isEmpty() || ssid == "<unknown ssid>") && ipStr != "0.0.0.0") {
+                        ssid = if (ipStr.startsWith("192.168.4.")) "ESP Hotspot" else "Connected Wi-Fi"
+                    }
+
+                    if (ssid.isEmpty() || ssid == "<unknown ssid>" || ipStr == "0.0.0.0") {
                         result.success(null)
                         return@setMethodCallHandler
                     }
 
-                    val ipInt = info.ipAddress
-                    val ipStr = String.format(
-                        "%d.%d.%d.%d",
-                        ipInt and 0xff,
-                        ipInt shr 8 and 0xff,
-                        ipInt shr 16 and 0xff,
-                        ipInt shr 24 and 0xff
-                    )
-
-                    val dhcp = wifiManager.dhcpInfo
-                    val gatewayInt = dhcp?.gateway ?: 0
-                    val gatewayStr = String.format(
-                        "%d.%d.%d.%d",
-                        gatewayInt and 0xff,
-                        gatewayInt shr 8 and 0xff,
-                        gatewayInt shr 16 and 0xff,
-                        gatewayInt shr 24 and 0xff
-                    )
-
                     val map = hashMapOf(
                         "ssid" to ssid,
-                        "bssid" to (info.bssid ?: ""),
+                        "bssid" to bssid,
                         "ip" to ipStr,
                         "gateway" to gatewayStr,
-                        "linkSpeed" to info.linkSpeed,
-                        "rssi" to info.rssi,
-                        "frequency" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) info.frequency else 2400
+                        "linkSpeed" to linkSpeed,
+                        "rssi" to rssi,
+                        "frequency" to frequency
                     )
                     result.success(map)
                 }

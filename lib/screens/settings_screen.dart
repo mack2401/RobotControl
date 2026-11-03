@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/state/robot_state.dart';
+import '../core/theme/app_theme.dart';
 import 'profile_screen.dart';
 import 'help_support_screen.dart';
 import 'about_screen.dart';
@@ -17,18 +18,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _voiceControl = true;
 
   @override
+  void initState() {
+    super.initState();
+    _darkMode = AppTheme.isDarkMode;
+    AppTheme.themeModeNotifier.addListener(_onThemeChanged);
+  }
+
+  @override
+  void dispose() {
+    AppTheme.themeModeNotifier.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) {
+      setState(() {
+        _darkMode = AppTheme.isDarkMode;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    _darkMode = isDark;
+
+    final scaffoldBg = isDark ? const Color(0xFF0B0F17) : const Color(0xFFF8FAFC);
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final dividerColor = isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+    final titleColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+    final rowTitleColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
+    final rowSubColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: scaffoldBg,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(64),
         child: Container(
-          decoration: const BoxDecoration(
-            color: Color(0xE6FFFFFF),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xE60F172A) : const Color(0xE6FFFFFF),
             border: Border(
-              bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+              bottom: BorderSide(color: cardBorder, width: 1),
             ),
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(color: Color(0x0A0F172A), blurRadius: 4, offset: Offset(0, 1)),
             ],
           ),
@@ -58,16 +91,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             borderRadius: BorderRadius.circular(12),
                             color: Colors.transparent,
                           ),
-                          child: const Icon(Icons.arrow_back, size: 24, color: Color(0xFF475569)),
+                          child: Icon(
+                            Icons.arrow_back,
+                            size: 24,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Text(
+                      Text(
                         "Settings",
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
+                          color: titleColor,
                           letterSpacing: -0.5,
                         ),
                       ),
@@ -85,9 +122,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF0F9FF),
+                        color: isDark ? const Color(0xFF0C4A6E) : const Color(0xFFF0F9FF),
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFFE0F2FE)),
+                        border: Border.all(color: isDark ? const Color(0xFF0284C7) : const Color(0xFFE0F2FE)),
                         boxShadow: const [
                           BoxShadow(color: Color(0x0A0284C7), blurRadius: 4, offset: Offset(0, 1)),
                         ],
@@ -109,11 +146,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardBg,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x060F172A), blurRadius: 6, offset: Offset(0, 2)),
+                border: Border.all(color: cardBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: isDark ? const Color(0x33000000) : const Color(0x060F172A),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
                 ],
               ),
               clipBehavior: Clip.antiAlias,
@@ -122,11 +163,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // 1. Profile
                   _buildNavigationRow(
                     icon: Icons.person,
-                    iconBg: const Color(0xFFF0F9FF),
-                    iconBorder: const Color(0xFFE0F2FE),
+                    iconBg: isDark ? const Color(0xFF0C4A6E) : const Color(0xFFF0F9FF),
+                    iconBorder: isDark ? const Color(0xFF0369A1) : const Color(0xFFE0F2FE),
                     iconColor: const Color(0xFF0284C7),
                     title: "Profile",
                     subtitle: "User profile information and picture",
+                    rowTitleColor: rowTitleColor,
+                    rowSubColor: rowSubColor,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -134,64 +177,85 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       );
                     },
                   ),
-                  const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+                  Divider(height: 1, thickness: 1, color: dividerColor),
 
                   // 2. Theme (Toggle: Dark Mode)
                   _buildToggleRow(
-                    icon: Icons.dark_mode,
-                    iconBg: const Color(0xFFF1F5F9),
-                    iconBorder: const Color(0xFFE2E8F0),
-                    iconColor: const Color(0xFF334155),
+                    icon: isDark ? Icons.dark_mode : Icons.light_mode,
+                    iconBg: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                    iconBorder: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
+                    iconColor: isDark ? const Color(0xFFF59E0B) : const Color(0xFF334155),
                     title: "Theme",
-                    subtitle: _darkMode ? "Dark Mode (Enabled)" : "Dark Mode",
+                    subtitle: _darkMode ? "Dark Mode (Enabled)" : "Dark Mode (Disabled)",
                     value: _darkMode,
+                    rowTitleColor: rowTitleColor,
+                    rowSubColor: rowSubColor,
+                    isDark: isDark,
                     onChanged: (val) {
-                      setState(() {
-                        _darkMode = val;
-                      });
+                      AppTheme.setDarkMode(val);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(_darkMode ? "Dark Mode activated" : "Light Mode activated"),
+                          content: Row(
+                            children: [
+                              Icon(
+                                val ? Icons.dark_mode : Icons.light_mode,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(val ? "Dark Mode activated" : "Light Mode activated"),
+                            ],
+                          ),
                           duration: const Duration(seconds: 1),
                           behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          backgroundColor: val ? const Color(0xFF0F172A) : const Color(0xFF0284C7),
                         ),
                       );
                     },
                   ),
-                  const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+                  Divider(height: 1, thickness: 1, color: dividerColor),
 
                   // 3. Voice Control (Toggle: Voice recognition)
                   _buildToggleRow(
                     icon: Icons.mic,
-                    iconBg: const Color(0xFFF0F9FF),
-                    iconBorder: const Color(0xFFE0F2FE),
+                    iconBg: isDark ? const Color(0xFF0C4A6E) : const Color(0xFFF0F9FF),
+                    iconBorder: isDark ? const Color(0xFF0369A1) : const Color(0xFFE0F2FE),
                     iconColor: const Color(0xFF0284C7),
                     title: "Voice Control",
                     subtitle: "Enable or disable voice command recognition",
                     value: _voiceControl,
+                    rowTitleColor: rowTitleColor,
+                    rowSubColor: rowSubColor,
+                    isDark: isDark,
                     onChanged: (val) {
                       setState(() {
                         _voiceControl = val;
                       });
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(_voiceControl ? "Voice command recognition enabled" : "Voice command recognition disabled"),
+                          content: Text(_voiceControl
+                              ? "Voice command recognition enabled"
+                              : "Voice command recognition disabled"),
                           duration: const Duration(seconds: 1),
                           behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       );
                     },
                   ),
-                  const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+                  Divider(height: 1, thickness: 1, color: dividerColor),
 
                   // 4. Help & Support
                   _buildNavigationRow(
                     icon: Icons.help_outline,
-                    iconBg: const Color(0xFFF0F9FF),
-                    iconBorder: const Color(0xFFE0F2FE),
+                    iconBg: isDark ? const Color(0xFF0C4A6E) : const Color(0xFFF0F9FF),
+                    iconBorder: isDark ? const Color(0xFF0369A1) : const Color(0xFFE0F2FE),
                     iconColor: const Color(0xFF0284C7),
                     title: "Help & Support",
                     subtitle: "Access help and troubleshooting information",
+                    rowTitleColor: rowTitleColor,
+                    rowSubColor: rowSubColor,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -199,16 +263,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       );
                     },
                   ),
-                  const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+                  Divider(height: 1, thickness: 1, color: dividerColor),
 
                   // 5. About App
                   _buildNavigationRow(
                     icon: Icons.info_outline,
-                    iconBg: const Color(0xFFF1F5F9),
-                    iconBorder: const Color(0xFFE2E8F0),
-                    iconColor: const Color(0xFF334155),
+                    iconBg: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                    iconBorder: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
+                    iconColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF334155),
                     title: "About App",
                     subtitle: "Version 2.4.0 • Build 4899",
+                    rowTitleColor: rowTitleColor,
+                    rowSubColor: rowSubColor,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -232,6 +298,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required Color iconColor,
     required String title,
     required String subtitle,
+    required Color rowTitleColor,
+    required Color rowSubColor,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -261,19 +329,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF1E293B),
+                            color: rowTitleColor,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         Text(
                           subtitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF64748B),
+                            color: rowSubColor,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -298,8 +366,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String title,
     required String subtitle,
     required bool value,
+    required Color rowTitleColor,
+    required Color rowSubColor,
+    required bool isDark,
     required ValueChanged<bool> onChanged,
   }) {
+    final trackInactive = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -325,19 +398,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF1E293B),
+                          color: rowTitleColor,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
                         subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF64748B),
+                          color: rowSubColor,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -357,7 +430,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(9999),
-                color: value ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0),
+                color: value ? const Color(0xFF0284C7) : trackInactive,
                 boxShadow: value
                     ? const [BoxShadow(color: Color(0x330284C7), blurRadius: 6, offset: Offset(0, 2))]
                     : null,

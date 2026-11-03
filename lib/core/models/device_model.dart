@@ -48,6 +48,27 @@ class RoboticDevice {
       deviceType: deviceType ?? this.deviceType,
     );
   }
+
+  bool get isRobotDevice {
+    final lower = name.toLowerCase();
+    return lower.contains("robot") ||
+        lower.contains("esp") ||
+        lower.contains("ibots") ||
+        lower.contains("hc-05") ||
+        lower.contains("hc-06") ||
+        lower.contains("bt05") ||
+        lower.contains("jdy") ||
+        lower.contains("at-09") ||
+        lower.contains("hm-10") ||
+        lower.contains("rover") ||
+        lower.contains("arm") ||
+        lower.contains("mecanum") ||
+        lower.contains("car") ||
+        lower.contains("arduino") ||
+        lower.contains("bot") ||
+        lower.contains("crawler") ||
+        lower.contains("relay");
+  }
 }
 
 enum LogType { system, bluetooth, tx, rx, error, cmd }

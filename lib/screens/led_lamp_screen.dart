@@ -27,6 +27,16 @@ class _LedLampScreenState extends State<LedLampScreen> {
   Offset _handleOffset = const Offset(178, 78);
   bool _isTransmitting = false;
 
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get scaffoldBg => isDark ? const Color(0xFF0B0F17) : const Color(0xFFF6F8FB);
+  Color get appBarBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFF6F8FB);
+  Color get cardBg => isDark ? const Color(0xFF1E293B) : Colors.white;
+  Color get cardBorder => isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+  Color get textPrimary => isDark ? Colors.white : const Color(0xFF1B1C1D);
+  Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF5A5F63);
+  Color get subBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+  Color get chipBg => isDark ? const Color(0xFF334155) : const Color(0xFFEFEDEE);
+
   final List<Color> _presetColors = const [
     Color(0xFFFF3131), // Crimson Red
     Color(0xFFFF9100), // Amber Glow
@@ -128,7 +138,7 @@ class _LedLampScreenState extends State<LedLampScreen> {
     final currentColor = Color.fromRGBO(_r, _g, _b, 1.0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FB),
+      backgroundColor: scaffoldBg,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -162,8 +172,8 @@ class _LedLampScreenState extends State<LedLampScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F8FB).withAlpha(245),
-        border: const Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        color: appBarBg.withAlpha(245),
+        border: Border(bottom: BorderSide(color: cardBorder)),
         boxShadow: const [
           BoxShadow(
               color: Color(0x050F172A), blurRadius: 6, offset: Offset(0, 2)),
@@ -183,9 +193,9 @@ class _LedLampScreenState extends State<LedLampScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardBg,
                         borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        border: Border.all(color: cardBorder),
                         boxShadow: const [
                           BoxShadow(
                               color: Color(0x06000000),
@@ -193,17 +203,17 @@ class _LedLampScreenState extends State<LedLampScreen> {
                               offset: Offset(0, 1)),
                         ],
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
                           Icon(Icons.arrow_back,
-                              size: 16, color: Color(0xFF1B1C1D)),
-                          SizedBox(width: 4),
+                              size: 16, color: textPrimary),
+                          const SizedBox(width: 4),
                           Text(
                             "Back",
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF1B1C1D)),
+                                color: textPrimary),
                           ),
                         ],
                       ),
@@ -212,17 +222,17 @@ class _LedLampScreenState extends State<LedLampScreen> {
                   const SizedBox(width: 10),
                   Text(
                     _activeTab == 0 ? "LED / Lamp" : "RGB Control",
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1B1C1D)),
+                        color: textPrimary),
                   ),
                   const SizedBox(width: 4),
-                  const Text(
+                  Text(
                     "— iBots",
                     style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF5A5F63),
+                        color: textSecondary,
                         fontWeight: FontWeight.w500),
                   ),
                 ],
@@ -234,9 +244,9 @@ class _LedLampScreenState extends State<LedLampScreen> {
           Container(
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: const Color(0xFFEFEDEE).withAlpha(180),
+              color: subBg,
               borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: const Color(0xFFCBD5E1).withAlpha(120)),
+              border: Border.all(color: cardBorder),
             ),
             child: Row(
               children: [
@@ -248,7 +258,7 @@ class _LedLampScreenState extends State<LedLampScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       decoration: BoxDecoration(
                         color:
-                            _activeTab == 0 ? Colors.white : Colors.transparent,
+                            _activeTab == 0 ? cardBg : Colors.transparent,
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: _activeTab == 0
                             ? const [
@@ -266,8 +276,8 @@ class _LedLampScreenState extends State<LedLampScreen> {
                             Icons.lightbulb,
                             size: 16,
                             color: _activeTab == 0
-                                ? const Color(0xFF094CB2)
-                                : const Color(0xFF5A5F63),
+                                ? (isDark ? const Color(0xFF38BDF8) : const Color(0xFF094CB2))
+                                : textSecondary,
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -278,8 +288,8 @@ class _LedLampScreenState extends State<LedLampScreen> {
                                   ? FontWeight.bold
                                   : FontWeight.w500,
                               color: _activeTab == 0
-                                  ? const Color(0xFF094CB2)
-                                  : const Color(0xFF5A5F63),
+                                  ? (isDark ? const Color(0xFF38BDF8) : const Color(0xFF094CB2))
+                                  : textSecondary,
                             ),
                           ),
                         ],
@@ -295,7 +305,7 @@ class _LedLampScreenState extends State<LedLampScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       decoration: BoxDecoration(
                         color:
-                            _activeTab == 1 ? Colors.white : Colors.transparent,
+                            _activeTab == 1 ? cardBg : Colors.transparent,
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: _activeTab == 1
                             ? const [
@@ -313,8 +323,8 @@ class _LedLampScreenState extends State<LedLampScreen> {
                             Icons.palette,
                             size: 16,
                             color: _activeTab == 1
-                                ? const Color(0xFF094CB2)
-                                : const Color(0xFF5A5F63),
+                                ? (isDark ? const Color(0xFF38BDF8) : const Color(0xFF094CB2))
+                                : textSecondary,
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -325,8 +335,8 @@ class _LedLampScreenState extends State<LedLampScreen> {
                                   ? FontWeight.bold
                                   : FontWeight.w500,
                               color: _activeTab == 1
-                                  ? const Color(0xFF094CB2)
-                                  : const Color(0xFF5A5F63),
+                                  ? (isDark ? const Color(0xFF38BDF8) : const Color(0xFF094CB2))
+                                  : textSecondary,
                             ),
                           ),
                         ],
@@ -353,9 +363,9 @@ class _LedLampScreenState extends State<LedLampScreen> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardBg,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: cardBorder),
             boxShadow: const [
               BoxShadow(
                   color: Color(0x06000000),
@@ -396,12 +406,12 @@ class _LedLampScreenState extends State<LedLampScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: _isLampOn
-                            ? const Color(0xFFFEF3C7)
-                            : const Color(0xFFF5F3F4).withAlpha(200),
+                            ? (isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7))
+                            : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F3F4).withAlpha(200)),
                         border: Border.all(
                           color: _isLampOn
                               ? const Color(0xFFF59E0B)
-                              : const Color(0xFFCBD5E1),
+                              : cardBorder,
                           width: _isLampOn ? 2 : 1,
                         ),
                         boxShadow: [
@@ -422,8 +432,8 @@ class _LedLampScreenState extends State<LedLampScreen> {
                             Icons.lightbulb,
                             size: 92,
                             color: _isLampOn
-                                ? const Color(0xFFD97706)
-                                : const Color(0xFF94A3B8),
+                                ? (isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706))
+                                : textSecondary,
                           ),
                           const SizedBox(height: 6),
                           Text(
@@ -433,8 +443,8 @@ class _LedLampScreenState extends State<LedLampScreen> {
                               fontWeight: FontWeight.bold,
                               letterSpacing: 1.5,
                               color: _isLampOn
-                                  ? const Color(0xFFB45309)
-                                  : const Color(0xFF64748B),
+                                  ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
+                                  : textSecondary,
                             ),
                           ),
                         ],
@@ -452,8 +462,8 @@ class _LedLampScreenState extends State<LedLampScreen> {
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.5,
                   color: _isLampOn
-                      ? const Color(0xFFD97706)
-                      : const Color(0xFF1B1C1D),
+                      ? (isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706))
+                      : textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -463,8 +473,8 @@ class _LedLampScreenState extends State<LedLampScreen> {
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                 decoration: BoxDecoration(
                   color: _isLampOn
-                      ? const Color(0xFFFEF3C7)
-                      : const Color(0xFFEFEDEE),
+                      ? (isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7))
+                      : chipBg,
                   borderRadius: BorderRadius.circular(30),
                   border: _isLampOn
                       ? Border.all(color: const Color(0xFFFCD34D))
@@ -479,8 +489,8 @@ class _LedLampScreenState extends State<LedLampScreen> {
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: _isLampOn
-                            ? const Color(0xFFB45309)
-                            : const Color(0xFF5A5F63),
+                            ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
+                            : textSecondary,
                       ),
                     ),
                     Text(
@@ -490,8 +500,8 @@ class _LedLampScreenState extends State<LedLampScreen> {
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: _isLampOn
-                            ? const Color(0xFFB45309)
-                            : const Color(0xFF1B1C1D),
+                            ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
+                            : textPrimary,
                       ),
                     ),
                   ],
@@ -507,9 +517,9 @@ class _LedLampScreenState extends State<LedLampScreen> {
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardBg,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: cardBorder),
             boxShadow: const [
               BoxShadow(
                   color: Color(0x05000000),
@@ -522,17 +532,17 @@ class _LedLampScreenState extends State<LedLampScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.brightness_medium,
+                      const Icon(Icons.brightness_medium,
                           size: 20, color: Color(0xFF094CB2)),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text(
                         "Lamp Intensity",
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1B1C1D)),
+                            color: textPrimary),
                       ),
                     ],
                   ),
@@ -540,16 +550,16 @@ class _LedLampScreenState extends State<LedLampScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE0F2FE),
+                      color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFE0F2FE),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       "${_lampPwm.toInt()}%",
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0284C7),
+                        color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
                       ),
                     ),
                   ),
@@ -559,7 +569,7 @@ class _LedLampScreenState extends State<LedLampScreen> {
               SliderTheme(
                 data: SliderTheme.of(context).copyWith(
                   activeTrackColor: const Color(0xFF094CB2),
-                  inactiveTrackColor: const Color(0xFFE2E8F0),
+                  inactiveTrackColor: cardBorder,
                   thumbColor: const Color(0xFF094CB2),
                   trackHeight: 4,
                   thumbShape:
@@ -592,9 +602,9 @@ class _LedLampScreenState extends State<LedLampScreen> {
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardBg,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: cardBorder),
             boxShadow: const [
               BoxShadow(
                   color: Color(0x06000000),
@@ -607,16 +617,16 @@ class _LedLampScreenState extends State<LedLampScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.palette, size: 20, color: Color(0xFF094CB2)),
-                      SizedBox(width: 8),
+                      const Icon(Icons.palette, size: 20, color: Color(0xFF094CB2)),
+                      const SizedBox(width: 8),
                       Text(
                         "Chromatic Spectrum",
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1B1C1D)),
+                            color: textPrimary),
                       ),
                     ],
                   ),
@@ -624,7 +634,7 @@ class _LedLampScreenState extends State<LedLampScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEFEDEE),
+                      color: chipBg,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -640,11 +650,11 @@ class _LedLampScreenState extends State<LedLampScreen> {
                         const SizedBox(width: 6),
                         Text(
                           _hexString,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1B1C1D),
+                            color: textPrimary,
                           ),
                         ),
                       ],
@@ -687,7 +697,7 @@ class _LedLampScreenState extends State<LedLampScreen> {
                             ],
                           ),
                           border: Border.all(
-                              color: const Color(0xFFCBD5E1), width: 1),
+                              color: cardBorder, width: 1),
                           boxShadow: const [
                             BoxShadow(
                                 color: Color(0x14000000),
@@ -696,7 +706,7 @@ class _LedLampScreenState extends State<LedLampScreen> {
                           ],
                         ),
                       ),
-                      // Smooth Radial Fade towards white center
+                      // Smooth Radial Fade towards center
                       Container(
                         width: wheelSize,
                         height: wheelSize,
@@ -704,8 +714,8 @@ class _LedLampScreenState extends State<LedLampScreen> {
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
                             colors: [
-                              Colors.white.withAlpha(240),
-                              Colors.white.withAlpha(160),
+                              (isDark ? const Color(0xFF1E293B) : Colors.white).withAlpha(240),
+                              (isDark ? const Color(0xFF1E293B) : Colors.white).withAlpha(160),
                               Colors.transparent,
                             ],
                             stops: const [0.08, 0.38, 0.72],
@@ -776,9 +786,9 @@ class _LedLampScreenState extends State<LedLampScreen> {
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardBg,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: cardBorder),
             boxShadow: const [
               BoxShadow(
                   color: Color(0x05000000),
@@ -788,7 +798,7 @@ class _LedLampScreenState extends State<LedLampScreen> {
           ),
           child: Column(
             children: [
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
@@ -796,7 +806,7 @@ class _LedLampScreenState extends State<LedLampScreen> {
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF5A5F63)),
+                        color: textSecondary),
                   ),
                 ],
               ),
@@ -820,9 +830,9 @@ class _LedLampScreenState extends State<LedLampScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardBg,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: cardBorder),
             boxShadow: const [
               BoxShadow(
                   color: Color(0x05000000),
@@ -833,12 +843,12 @@ class _LedLampScreenState extends State<LedLampScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 "ARCHIVAL PRESETS",
                 style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF5A5F63)),
+                    color: textSecondary),
               ),
               const SizedBox(height: 12),
               Row(
@@ -856,7 +866,7 @@ class _LedLampScreenState extends State<LedLampScreen> {
                         border: Border.all(
                           color: isSelected
                               ? const Color(0xFF094CB2)
-                              : const Color(0xFFE2E8F0),
+                              : cardBorder,
                           width: isSelected ? 3 : 1,
                         ),
                         boxShadow: [
@@ -934,9 +944,9 @@ class _LedLampScreenState extends State<LedLampScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
+          color: subBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: cardBorder),
         ),
         child: Column(
           children: [
@@ -948,18 +958,18 @@ class _LedLampScreenState extends State<LedLampScreen> {
             const SizedBox(height: 2),
             Text(
               "$val",
-              style: const TextStyle(
+              style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1B1C1D)),
+                  color: textPrimary),
             ),
             const SizedBox(height: 6),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: Container(
                 height: 4,
-                color: const Color(0xFFE2E8F0),
+                color: cardBorder,
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: FractionallySizedBox(

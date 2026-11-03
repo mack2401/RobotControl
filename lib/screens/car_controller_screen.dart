@@ -28,13 +28,16 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
   static const String _chevronImageUrl =
       "https://lh3.googleusercontent.com/aida-public/AB6AXuDyEMc9YXP1P8iafUc7m1F5EAAtUfQP0Mmoej5t0wInCeQwFlTVIbdwm_xJUh3eBZ87MXf5-Cv6QV_YSCiWOCle8qU-2_W5-zxvL0fedqpTmaeifgP7WNDL-MNKHpL8Lzr4tg3BCMoN5i4ySiEhOCJpIZ-3McJywKapeNIVsydFDwLF2bT5SYs3IvWJkDXKObQlnSbIsTZoI7WKWOAZFa0sbRFXsq8L9mZ9DQYv6AQDZAdNMHBX5ljynCqd4LyW0bvLU2s";
 
-  final List<List<String>> _danceSteps = const [
-    ['F', 'L'],
-    ['B', 'R'],
-    ['F', 'R'],
-    ['B', 'L'],
-    ['F'],
-    ['B'],
+  final List<String> _danceSteps = const [
+    'FORWARD',
+    'RIGHT',
+    'BACKWARD',
+    'LEFT',
+    'FORWARD',
+    'LEFT',
+    'BACKWARD',
+    'RIGHT',
+    'STOP',
   ];
 
   @override
@@ -144,13 +147,23 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
       _showToast("Choreography Routine Started!");
       state.toggleDanceMode();
 
-      _danceTimer = Timer.periodic(const Duration(milliseconds: 450), (timer) {
-        _activeCommands.clear();
-        final currentStep = _danceSteps[_danceStep % _danceSteps.length];
-        for (var cmd in currentStep) {
-          _activeCommands.add(cmd);
+      _danceTimer = Timer.periodic(const Duration(milliseconds: 750), (timer) {
+        if (!mounted || !state.isConnected) {
+          _stopDanceMode();
+          return;
         }
-        _syncCommandsToRobot();
+        final cmd = _danceSteps[_danceStep % _danceSteps.length];
+        _activeCommands.clear();
+        if (cmd == 'FORWARD') {
+          _activeCommands.add('F');
+        } else if (cmd == 'BACKWARD') {
+          _activeCommands.add('B');
+        } else if (cmd == 'LEFT') {
+          _activeCommands.add('L');
+        } else if (cmd == 'RIGHT') {
+          _activeCommands.add('R');
+        }
+        state.sendCarMotionCommand(cmd);
         _danceStep++;
         if (mounted) setState(() {});
       });
@@ -162,13 +175,15 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
     _danceTimer?.cancel();
     _danceTimer = null;
     _activeCommands.clear();
-    _syncCommandsToRobot();
+    state.sendCarMotionCommand('STOP');
     if (state.danceMode) state.toggleDanceMode();
     if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
@@ -178,14 +193,14 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
         ]);
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: isDark ? const Color(0xFF0B0F17) : const Color(0xFFF8FAFC),
         body: SafeArea(
           child: Stack(
             children: [
               Column(
                 children: [
                   // Compact Top Header Bar
-                  _buildTopHeaderBar(),
+                  _buildTopHeaderBar(isDark),
                   // Main Horizontal Controller Arena
                   Expanded(
                     child: Padding(
@@ -196,19 +211,19 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                           // LEFT POD: Forward & Backward (col-span-4)
                           Expanded(
                             flex: 4,
-                            child: _buildLeftPod(),
+                            child: _buildLeftPod(isDark),
                           ),
                           const SizedBox(width: 12),
                           // CENTER POD: Sleek & Compact Utility Column (col-span-4)
                           Expanded(
                             flex: 4,
-                            child: _buildCenterPod(),
+                            child: _buildCenterPod(isDark),
                           ),
                           const SizedBox(width: 12),
                           // RIGHT POD: Left Turn & Right Turn (col-span-4)
                           Expanded(
                             flex: 4,
-                            child: _buildRightPod(),
+                            child: _buildRightPod(isDark),
                           ),
                         ],
                       ),
@@ -254,17 +269,21 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
   }
 
   // --- COMPACT TOP HEADER BAR ---
-  Widget _buildTopHeaderBar() {
+  Widget _buildTopHeaderBar(bool isDark) {
     final dev = state.currentDevice;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(245),
-        border: const Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-        boxShadow: const [
-          BoxShadow(color: Color(0x050F172A), blurRadius: 8, offset: Offset(0, 2)),
+        color: isDark ? const Color(0xFF1E293B).withAlpha(245) : Colors.white.withAlpha(245),
+        border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? const Color(0x33000000) : const Color(0x050F172A),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Row(
@@ -287,22 +306,22 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                   child: Container(
                     width: 32,
                     height: 32,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF1F5F9),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.arrow_back, color: Color(0xFF0369A1), size: 17),
+                    child: Icon(Icons.arrow_back, color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0369A1), size: 17),
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Flexible(
+                Flexible(
                   child: Text(
                     "Car Controller",
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                       letterSpacing: -0.3,
-                      color: Color(0xFF0F172A),
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -312,9 +331,9 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
+                      color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                      border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -330,10 +349,10 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                         const SizedBox(width: 4),
                         Text(
                           "CONNECTED • ${dev.protocol}",
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 8.5,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF059669),
+                            color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                             fontFamily: 'monospace',
                           ),
                         ),
@@ -345,18 +364,27 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                 InkWell(
                   onTap: () {
                     state.toggleMotionCommandProtocol();
-                    _showToast(state.useNumericMotionCommands
-                        ? "Protocol: 1/2/3/4/0 (Mecanum/Numeric)"
-                        : "Protocol: F/B/L/R/S (Standard)");
+                    final modeName = state.motionProtocolMode == 1
+                        ? "Protocol: FORWARD/LEFT/STOP (Words)"
+                        : (state.motionProtocolMode == 2 ? "Protocol: 1/2/3/4/0 (Numeric)" : "Protocol: F/B/L/R/S (Standard)");
+                    _showToast(modeName);
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: state.useNumericMotionCommands ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
+                      color: state.motionProtocolMode == 1
+                          ? (isDark ? const Color(0xFF065F46) : const Color(0xFFECFDF5))
+                          : (state.motionProtocolMode == 2
+                              ? (isDark ? const Color(0xFF075985) : const Color(0xFFEFF6FF))
+                              : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9))),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: state.useNumericMotionCommands ? const Color(0xFF38BDF8) : const Color(0xFFCBD5E1),
+                        color: state.motionProtocolMode == 1
+                            ? const Color(0xFF10B981)
+                            : (state.motionProtocolMode == 2
+                                ? const Color(0xFF38BDF8)
+                                : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1))),
                       ),
                     ),
                     child: Row(
@@ -365,16 +393,26 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                         Icon(
                           Icons.swap_horiz,
                           size: 11,
-                          color: state.useNumericMotionCommands ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                          color: state.motionProtocolMode == 1
+                              ? const Color(0xFF10B981)
+                              : (state.motionProtocolMode == 2
+                                  ? (isDark ? const Color(0xFF7DD3FC) : const Color(0xFF0284C7))
+                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
                         ),
                         const SizedBox(width: 3),
                         Text(
-                          state.useNumericMotionCommands ? "CMD: 1 2 3 4 0" : "CMD: F B L R S",
+                          state.motionProtocolMode == 1
+                              ? "CMD: FORWARD/LEFT"
+                              : (state.motionProtocolMode == 2 ? "CMD: 1 2 3 4 0" : "CMD: F B L R S"),
                           style: TextStyle(
                             fontSize: 8.5,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'monospace',
-                            color: state.useNumericMotionCommands ? const Color(0xFF0369A1) : const Color(0xFF475569),
+                            color: state.motionProtocolMode == 1
+                                ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857))
+                                : (state.motionProtocolMode == 2
+                                    ? (isDark ? const Color(0xFFBAE6FD) : const Color(0xFF0369A1))
+                                    : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569))),
                           ),
                         ),
                       ],
@@ -390,9 +428,9 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
             constraints: const BoxConstraints(maxWidth: 270),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -403,13 +441,13 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
+                    Text(
                       "SPEED CAP",
-                      style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 0.5),
+                      style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8), letterSpacing: 0.5),
                     ),
                     Text(
                       "${state.speedCap.toInt()}% (${state.driveMode})",
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'monospace'),
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF1E293B), fontFamily: 'monospace'),
                     ),
                   ],
                 ),
@@ -421,7 +459,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                       thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                       overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
                       activeTrackColor: const Color(0xFF0284C7),
-                      inactiveTrackColor: const Color(0xFFE2E8F0),
+                      inactiveTrackColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                       thumbColor: const Color(0xFF0284C7),
                     ),
                     child: Slider(
@@ -445,7 +483,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
   }
 
   // --- LEFT POD: FORWARD & BACKWARD ---
-  Widget _buildLeftPod() {
+  Widget _buildLeftPod(bool isDark) {
     final isForward = _activeCommands.contains('F');
     final isBackward = _activeCommands.contains('B');
 
@@ -458,6 +496,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
             isActive: isForward,
             quarterTurns: 3, // -90 deg
             label: "Forward",
+            isDark: isDark,
           ),
         ),
         const SizedBox(height: 10),
@@ -468,6 +507,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
             isActive: isBackward,
             quarterTurns: 1, // 90 deg
             label: "Backward",
+            isDark: isDark,
           ),
         ),
       ],
@@ -475,7 +515,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
   }
 
   // --- RIGHT POD: LEFT TURN & RIGHT TURN ---
-  Widget _buildRightPod() {
+  Widget _buildRightPod(bool isDark) {
     final isLeft = _activeCommands.contains('L');
     final isRight = _activeCommands.contains('R');
 
@@ -488,6 +528,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
             isActive: isLeft,
             quarterTurns: 2, // 180 deg
             label: "Left Turn",
+            isDark: isDark,
           ),
         ),
         const SizedBox(width: 10),
@@ -498,6 +539,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
             isActive: isRight,
             quarterTurns: 0, // 0 deg
             label: "Right Turn",
+            isDark: isDark,
           ),
         ),
       ],
@@ -505,7 +547,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
   }
 
   // --- CENTER POD: COMPACT UTILITIES ---
-  Widget _buildCenterPod() {
+  Widget _buildCenterPod(bool isDark) {
     return FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.center,
@@ -515,7 +557,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Top Status Micro Pill
-            _buildMotionStatusPill(),
+            _buildMotionStatusPill(isDark),
             const SizedBox(height: 6),
 
         // Emergency STOP Button
@@ -573,11 +615,17 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
             constraints: const BoxConstraints(maxWidth: 210),
             padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 12),
             decoration: BoxDecoration(
-              color: _isHornPressed ? const Color(0xFFF1F5F9) : Colors.white,
+              color: _isHornPressed
+                  ? (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9))
+                  : (isDark ? const Color(0xFF1E293B) : Colors.white),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: const [
-                BoxShadow(color: Color(0x060F172A), blurRadius: 4, offset: Offset(0, 1)),
+              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: isDark ? const Color(0x33000000) : const Color(0x060F172A),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
               ],
             ),
             child: Row(
@@ -589,9 +637,14 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                   color: _isHornPressed ? const Color(0xFFF59E0B) : const Color(0xFF0284C7),
                 ),
                 const SizedBox(width: 6),
-                const Text(
+                Text(
                   "HORN",
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Color(0xFF475569)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                  ),
                 ),
               ],
             ),
@@ -610,11 +663,15 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
             constraints: const BoxConstraints(maxWidth: 210),
             padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: const [
-                BoxShadow(color: Color(0x060F172A), blurRadius: 4, offset: Offset(0, 1)),
+              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: isDark ? const Color(0x33000000) : const Color(0x060F172A),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
               ],
             ),
             child: Row(
@@ -625,7 +682,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                     Icon(
                       Icons.light_mode,
                       size: 16,
-                      color: state.headlights ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
+                      color: state.headlights ? const Color(0xFFF59E0B) : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -634,7 +691,9 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.8,
-                        color: state.headlights ? const Color(0xFFD97706) : const Color(0xFF475569),
+                        color: state.headlights
+                            ? const Color(0xFFF59E0B)
+                            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
                       ),
                     ),
                   ],
@@ -643,7 +702,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: state.headlights ? const Color(0xFFF59E0B) : const Color(0xFFCBD5E1),
+                    color: state.headlights ? const Color(0xFFF59E0B) : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -661,13 +720,21 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
             constraints: const BoxConstraints(maxWidth: 210),
             padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 12),
             decoration: BoxDecoration(
-              color: _danceTimer != null ? const Color(0xFF0284C7) : const Color(0xFFF1F5F9),
+              color: _danceTimer != null
+                  ? const Color(0xFF0284C7)
+                  : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _danceTimer != null ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0),
+                color: _danceTimer != null
+                    ? const Color(0xFF0284C7)
+                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
-              boxShadow: const [
-                BoxShadow(color: Color(0x060F172A), blurRadius: 4, offset: Offset(0, 1)),
+              boxShadow: [
+                BoxShadow(
+                  color: isDark ? const Color(0x33000000) : const Color(0x060F172A),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
               ],
             ),
             child: Row(
@@ -678,7 +745,9 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                     Icon(
                       Icons.smart_toy,
                       size: 16,
-                      color: _danceTimer != null ? Colors.white : const Color(0xFFB45309),
+                      color: _danceTimer != null
+                          ? Colors.white
+                          : (isDark ? const Color(0xFFF59E0B) : const Color(0xFFB45309)),
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -687,7 +756,9 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.8,
-                        color: _danceTimer != null ? Colors.white : const Color(0xFFB45309),
+                        color: _danceTimer != null
+                            ? Colors.white
+                            : (isDark ? const Color(0xFFF59E0B) : const Color(0xFFB45309)),
                       ),
                     ),
                   ],
@@ -697,7 +768,9 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w600,
-                    color: _danceTimer != null ? Colors.white : const Color(0xFF64748B),
+                    color: _danceTimer != null
+                        ? Colors.white
+                        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                   ),
                 ),
               ],
@@ -710,25 +783,25 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
     );
   }
 
-  Widget _buildMotionStatusPill() {
+  Widget _buildMotionStatusPill(bool isDark) {
     if (_isEmergencyStopped) {
       return Container(
         width: double.infinity,
         constraints: const BoxConstraints(maxWidth: 210),
         padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFFEE2E2),
+          color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFFECACA)),
+          border: Border.all(color: isDark ? const Color(0xFF991B1B) : const Color(0xFFFECACA)),
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.circle, size: 6, color: Color(0xFFDC2626)),
-            SizedBox(width: 5),
+            const Icon(Icons.circle, size: 6, color: Color(0xFFEF4444)),
+            const SizedBox(width: 5),
             Text(
               "EMERGENCY HALT",
-              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFFDC2626), fontFamily: 'monospace'),
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626), fontFamily: 'monospace'),
             ),
           ],
         ),
@@ -741,17 +814,17 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
         constraints: const BoxConstraints(maxWidth: 210),
         padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFE2E8F0).withAlpha(160),
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0).withAlpha(160),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.circle, size: 6, color: Color(0xFF0284C7)),
-            SizedBox(width: 5),
+            const Icon(Icons.circle, size: 6, color: Color(0xFF0284C7)),
+            const SizedBox(width: 5),
             Text(
               "IDLE • STANDBY",
-              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569), fontFamily: 'monospace'),
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569), fontFamily: 'monospace'),
             ),
           ],
         ),
@@ -769,9 +842,9 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
       constraints: const BoxConstraints(maxWidth: 210),
       padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFE0F2FE),
+        color: isDark ? const Color(0xFF0C4A6E).withAlpha(160) : const Color(0xFFE0F2FE),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFBAE6FD)),
+        border: Border.all(color: isDark ? const Color(0xFF0369A1) : const Color(0xFFBAE6FD)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -784,7 +857,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
           const SizedBox(width: 5),
           Text(
             parts.join(' + '),
-            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF0284C7), fontFamily: 'monospace'),
+            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7), fontFamily: 'monospace'),
           ),
         ],
       ),
@@ -797,6 +870,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
     required bool isActive,
     required int quarterTurns,
     required String label,
+    required bool isDark,
   }) {
     return Listener(
       onPointerDown: (_) => _startCommand(cmdCode),
@@ -805,15 +879,21 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF0284C7) : Colors.white,
+          color: isActive
+              ? const Color(0xFF0284C7)
+              : (isDark ? const Color(0xFF1E293B) : Colors.white),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isActive ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0),
+            color: isActive
+                ? const Color(0xFF0284C7)
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: isActive ? const Color(0x330284C7) : const Color(0x060F172A),
+              color: isActive
+                  ? const Color(0x330284C7)
+                  : (isDark ? const Color(0x33000000) : const Color(0x060F172A)),
               blurRadius: isActive ? 12 : 6,
               offset: const Offset(0, 2),
             ),
@@ -827,12 +907,16 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
               width: 48,
               height: 48,
               fit: BoxFit.contain,
-              color: isActive ? Colors.white : const Color(0xFF0284C7),
+              color: isActive
+                  ? Colors.white
+                  : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
               colorBlendMode: BlendMode.srcIn,
               errorBuilder: (context, error, stackTrace) => Icon(
                 Icons.arrow_forward_rounded,
                 size: 42,
-                color: isActive ? Colors.white : const Color(0xFF0284C7),
+                color: isActive
+                    ? Colors.white
+                    : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
               ),
             ),
           ),

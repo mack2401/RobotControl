@@ -32,6 +32,16 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
   DateTime _lastSliderSend = DateTime.now();
   int _lastSentAngle = -1;
 
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get scaffoldBg => isDark ? const Color(0xFF0B0F17) : const Color(0xFFF8FAFC);
+  Color get appBarBg => isDark ? const Color(0xFF0F172A) : Colors.white;
+  Color get cardBg => isDark ? const Color(0xFF1E293B) : Colors.white;
+  Color get cardBorder => isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+  Color get textPrimary => isDark ? Colors.white : const Color(0xFF0F172A);
+  Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+  Color get subBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+  Color get chipBg => isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+
   @override
   void initState() {
     super.initState();
@@ -119,7 +129,7 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -127,17 +137,17 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: const Color(0xFFF0F9FF),
+                color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFF0F9FF),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFBAE6FD)),
+                border: Border.all(color: isDark ? const Color(0xFF38BDF8) : const Color(0xFFBAE6FD)),
               ),
               child: Center(
                 child: Text(
                   item.letter,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0284C7),
+                    color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
                   ),
                 ),
               ),
@@ -145,7 +155,7 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
             const SizedBox(width: 8),
             Text(
               "Edit Movement ${item.letter}",
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ],
         ),
@@ -153,21 +163,23 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               "Movement Name",
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textSecondary),
             ),
             const SizedBox(height: 6),
             TextField(
               controller: titleController,
               autofocus: true,
+              style: TextStyle(color: textPrimary),
               textCapitalization: TextCapitalization.words,
               decoration: InputDecoration(
                 hintText: "e.g. Base Rotation, Gripper Clamp",
+                hintStyle: TextStyle(color: textSecondary),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                  borderSide: BorderSide(color: cardBorder),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -176,20 +188,22 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               "Joint / Subtitle (Optional)",
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textSecondary),
             ),
             const SizedBox(height: 6),
             TextField(
               controller: subtitleController,
+              style: TextStyle(color: textPrimary),
               textCapitalization: TextCapitalization.words,
               decoration: InputDecoration(
                 hintText: "e.g. Shoulder / Axis 2",
+                hintStyle: TextStyle(color: textSecondary),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                  borderSide: BorderSide(color: cardBorder),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -202,7 +216,7 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel", style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+            child: Text("Cancel", style: TextStyle(color: textSecondary, fontWeight: FontWeight.w600)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -241,10 +255,10 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white.withOpacity(0.95),
+        backgroundColor: appBarBg.withOpacity(0.95),
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
           child: InkWell(
@@ -253,15 +267,16 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
             child: Container(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFF1F5F9),
+                color: cardBg,
+                border: Border.all(color: cardBorder),
               ),
-              child: const Icon(Icons.arrow_back, size: 20, color: Color(0xFF334155)),
+              child: Icon(Icons.arrow_back, size: 20, color: textPrimary),
             ),
           ),
         ),
-        title: const Text(
+        title: Text(
           'Robotic Arm Control',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textPrimary),
         ),
         actions: [
           Padding(
@@ -272,17 +287,17 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: chipBg,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: cardBorder),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.restart_alt, size: 15, color: Color(0xFF475569)),
-                    SizedBox(width: 4),
+                    Icon(Icons.restart_alt, size: 15, color: textSecondary),
+                    const SizedBox(width: 4),
                     Text(
                       'Center All',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textSecondary),
                     ),
                   ],
                 ),
@@ -307,9 +322,9 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
                     margin: const EdgeInsets.only(bottom: 14),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: cardBg,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: cardBorder),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.02),
@@ -330,17 +345,17 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
                                   width: 32,
                                   height: 32,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF0F9FF),
+                                    color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFF0F9FF),
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFBAE6FD)),
+                                    border: Border.all(color: isDark ? const Color(0xFF38BDF8) : const Color(0xFFBAE6FD)),
                                   ),
                                   child: Center(
                                     child: Text(
                                       item.letter,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF0284C7),
+                                        color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
                                       ),
                                     ),
                                   ),
@@ -353,10 +368,10 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
                                       children: [
                                         Text(
                                           item.title,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,
-                                            color: Color(0xFF1E293B),
+                                            color: textPrimary,
                                           ),
                                         ),
                                         const SizedBox(width: 6),
@@ -366,7 +381,7 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
                                           child: Container(
                                             padding: const EdgeInsets.all(3),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFFF1F5F9),
+                                              color: chipBg,
                                               borderRadius: BorderRadius.circular(6),
                                             ),
                                             child: const Icon(
@@ -380,7 +395,7 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
                                     ),
                                     Text(
                                       item.subtitle,
-                                      style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                      style: TextStyle(fontSize: 11, color: textSecondary),
                                     ),
                                   ],
                                 ),
@@ -391,9 +406,9 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF8FAFC),
+                                    color: subBg,
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    border: Border.all(color: cardBorder),
                                   ),
                                   child: Row(
                                     crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -401,19 +416,19 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
                                     children: [
                                       Text(
                                         '${item.angle.toInt()}',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontFamily: 'monospace',
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
-                                          color: Color(0xFF0284C7),
+                                          color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
                                         ),
                                       ),
-                                      const Text(
+                                      Text(
                                         '°',
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
-                                          color: Color(0xFF64748B),
+                                          color: textSecondary,
                                         ),
                                       ),
                                     ],
@@ -424,9 +439,9 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
                                   InkWell(
                                     onTap: () => _removeMovement(index),
                                     borderRadius: BorderRadius.circular(6),
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(4.0),
-                                      child: Icon(Icons.close, size: 16, color: Color(0xFF94A3B8)),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(4.0),
+                                      child: Icon(Icons.close, size: 16, color: textSecondary),
                                     ),
                                   ),
                                 ],
@@ -438,19 +453,19 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
                         // Slider Row
                         Row(
                           children: [
-                            const Text('0°', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFF94A3B8))),
+                            Text('0°', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: textSecondary)),
                             Expanded(
                               child: Slider(
                                 value: item.angle,
                                 min: 0,
                                 max: 180,
                                 activeColor: const Color(0xFF0284C7),
-                                inactiveColor: const Color(0xFFE2E8F0),
+                                inactiveColor: cardBorder,
                                 onChanged: (val) => _onAngleChanged(item, val),
                                 onChangeEnd: (val) => _onAngleChangeEnd(item, val),
                               ),
                             ),
-                            const Text('180°', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFF94A3B8))),
+                            Text('180°', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: textSecondary)),
                           ],
                         ),
                       ],

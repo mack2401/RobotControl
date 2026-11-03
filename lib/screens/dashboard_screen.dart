@@ -14,6 +14,7 @@ import 'telemetry_screen.dart';
 import 'esp32_cam_screen.dart';
 import 'robotic_arm_screen.dart';
 import 'gyro_control_screen.dart';
+import 'litewing_drone_screen.dart';
 import 'settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -58,8 +59,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0B0F17) : const Color(0xFFF8FAFC),
       body: Stack(
         children: [
           SafeArea(
@@ -71,16 +74,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Brand Header
-                  _buildBrandHeader(),
+                  _buildBrandHeader(isDark),
                   const SizedBox(height: 12),
                   // Device Connection Card
-                  _buildDeviceConnectionCard(),
+                  _buildDeviceConnectionCard(isDark),
                   const SizedBox(height: 24),
                   // Control Center Header
-                  _buildSectionHeader(),
+                  _buildSectionHeader(isDark),
                   const SizedBox(height: 12),
                   // 11 Feature Tools Grid
-                  _buildToolsGrid(),
+                  _buildToolsGrid(isDark),
                 ],
               ),
             ),
@@ -140,7 +143,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildBrandHeader() {
+  Widget _buildBrandHeader(bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
       child: Row(
@@ -181,13 +184,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Flexible(
+                Flexible(
                   child: Text(
                     "iBots Remote Controller",
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                       letterSpacing: -0.3,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -197,7 +200,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.settings_outlined, color: Color(0xFF64748B), size: 22),
+            icon: Icon(
+              Icons.settings_outlined,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              size: 22,
+            ),
             onPressed: () {
               Navigator.push(
                 context,
@@ -241,27 +248,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       // 2. Otherwise prompt user with Wi-Fi Password Dialog
-      final targetSsid = (target.name.contains("ESP") || target.name.contains("Robot") || target.name.contains("Mecanum"))
-          ? "iBots-Robot"
-          : target.name;
-      final matching = state.wifiService.availableNetworks.firstWhere(
-        (n) => n.ssid.toLowerCase() == targetSsid.toLowerCase() || n.isEspDevice,
-        orElse: () => RealWifiNetwork(
-          ssid: targetSsid,
-          bssid: target.macAddress,
-          level: target.rssi,
-          frequency: 2412,
-          capabilities: "[WPA2-PSK]",
-          isSaved: true,
-        ),
-      );
+      final matchingList = state.wifiService.availableNetworks.where(
+        (n) => n.ssid.toLowerCase() == target.name.toLowerCase() ||
+               (target.macAddress.isNotEmpty && n.bssid.toLowerCase() == target.macAddress.toLowerCase()),
+      ).toList();
 
-      final ok = await WifiConnectDialog.show(context, matching, onSuccess: () {
-        _showToast("Connected to ${matching.ssid}!");
-      });
-      if (ok) {
-        _showToast("Connected to ${matching.ssid}!");
+      if (matchingList.isNotEmpty) {
+        if (!mounted) return;
+        final matching = matchingList.first;
+        final ok = await WifiConnectDialog.show(context, matching, onSuccess: () {
+          _showToast("Connected to ${matching.ssid}!");
+        });
+        if (ok) {
+          _showToast("Connected to ${matching.ssid}!");
+        }
+        return;
       }
+
+      final espCandidates = state.wifiService.availableNetworks.where((n) => n.isEspDevice).toList();
+      if (espCandidates.isNotEmpty) {
+        if (!mounted) return;
+        final ok = await WifiConnectDialog.show(context, espCandidates.first, onSuccess: () {
+          _showToast("Connected to ${espCandidates.first.ssid}!");
+        });
+        if (ok) {
+          _showToast("Connected to ${espCandidates.first.ssid}!");
+        }
+        return;
+      }
+
+      _showToast("Wi-Fi network '${target.name}' not found nearby.");
       return;
     }
 
@@ -275,7 +291,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Widget _buildDeviceConnectionCard() {
+  Widget _buildDeviceConnectionCard(bool isDark) {
     final dev = state.currentDevice;
     final target = state.targetDevice ?? dev;
     final isConnected = state.connectionStatus == ConnectionStatus.connected;
@@ -284,14 +300,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFF1F5F9), width: 1),
-        boxShadow: const [
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+          width: 1,
+        ),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0D0F172A),
+            color: isDark ? const Color(0x33000000) : const Color(0x0D0F172A),
             blurRadius: 20,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -312,19 +331,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         width: 34,
                         height: 34,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF0F9FF),
+                          color: isDark ? const Color(0xFF0C4A6E) : const Color(0xFFF0F9FF),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(Icons.memory, color: Color(0xFF0284C7), size: 18),
                       ),
                       const SizedBox(width: 8),
-                      const Flexible(
+                      Flexible(
                         child: Text(
                           "Your device",
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -341,11 +360,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   decoration: BoxDecoration(
                     color: isConnected
                         ? const Color(0xFFECFDF5)
-                        : (isConnecting ? const Color(0xFFFFFBEB) : const Color(0xFFF1F5F9)),
+                        : (isConnecting
+                            ? const Color(0xFFFFFBEB)
+                            : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9))),
                     borderRadius: BorderRadius.circular(20),
                     border: isConnected
                         ? Border.all(color: const Color(0xFFA7F3D0))
-                        : (isConnecting ? Border.all(color: const Color(0xFFFDE68A)) : null),
+                        : (isConnecting
+                            ? Border.all(color: const Color(0xFFFDE68A))
+                            : (isDark ? Border.all(color: const Color(0xFF334155)) : null)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -371,7 +394,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             fontWeight: FontWeight.w600,
                             color: isConnected
                                 ? const Color(0xFF059669)
-                                : (isConnecting ? const Color(0xFFD97706) : const Color(0xFF64748B)),
+                                : (isConnecting
+                                    ? const Color(0xFFD97706)
+                                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -387,17 +412,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFF1F5F9)),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+              ),
             ),
             child: Row(
               children: [
-                _buildProtocolTab("Bluetooth", "(Classic)", Icons.bluetooth, "Bluetooth (Classic)"),
+                _buildProtocolTab("Bluetooth", "(Classic)", Icons.bluetooth, "Bluetooth (Classic)", isDark),
                 const SizedBox(width: 6),
-                _buildProtocolTab("BLE", "Low energy", Icons.bluetooth_searching, "BLE 5.2"),
+                _buildProtocolTab("BLE", "Low energy", Icons.bluetooth_searching, "BLE 5.2", isDark),
                 const SizedBox(width: 6),
-                _buildProtocolTab("Wi-Fi", "Wireless", Icons.wifi, "Wi-Fi AP"),
+                _buildProtocolTab("Wi-Fi", "Wireless", Icons.wifi, "Wi-Fi AP", isDark),
               ],
             ),
           ),
@@ -415,11 +442,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Text.rich(
                       TextSpan(
                         text: "Target: ",
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'monospace'),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                          fontFamily: 'monospace',
+                        ),
                         children: [
                           TextSpan(
                             text: "${target.name} (${state.activeProtocol})",
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                            ),
                           ),
                         ],
                       ),
@@ -522,7 +556,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildProtocolTab(String title, String subtitle, IconData icon, String protocolKey) {
+  Widget _buildProtocolTab(String title, String subtitle, IconData icon, String protocolKey, bool isDark) {
     final isSelected = state.activeProtocol == protocolKey ||
         (protocolKey == "Bluetooth (Classic)" && state.activeProtocol.contains("Classic"));
 
@@ -538,17 +572,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 9),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
+            color: isSelected
+                ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: isSelected
-                ? Border.all(color: const Color(0xFFBAE6FD), width: 1)
+                ? Border.all(
+                    color: isDark ? const Color(0xFF0284C7) : const Color(0xFFBAE6FD),
+                    width: 1,
+                  )
                 : null,
             boxShadow: isSelected
-                ? const [
+                ? [
                     BoxShadow(
-                      color: Color(0x0A0F172A),
+                      color: isDark ? const Color(0x33000000) : const Color(0x0A0F172A),
                       blurRadius: 6,
-                      offset: Offset(0, 2),
+                      offset: const Offset(0, 2),
                     ),
                   ]
                 : null,
@@ -566,14 +605,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF475569),
+                  color: isSelected
+                      ? (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7))
+                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
                 ),
               ),
               Text(
                 subtitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 9,
-                  color: Color(0xFF94A3B8),
+                  color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                 ),
               ),
             ],
@@ -583,34 +624,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildSectionHeader() {
+  Widget _buildSectionHeader(bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
+          Text(
             "Your control center",
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF0F172A),
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
               letterSpacing: -0.3,
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
-              color: const Color(0xFFE2E8F0).withAlpha(160),
+              color: isDark
+                  ? const Color(0xFF334155)
+                  : const Color(0xFFE2E8F0).withAlpha(160),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Text(
-              "11 tools",
+            child: Text(
+              "12 tools",
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 fontFamily: 'monospace',
-                color: Color(0xFF475569),
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
               ),
             ),
           ),
@@ -619,7 +662,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildToolsGrid() {
+  Widget _buildToolsGrid(bool isDark) {
     final tools = [
       _ToolCardData(
         title: "Car Controller",
@@ -709,6 +752,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         visualWidget: _buildGyroVisual(),
         screen: const GyroControlScreen(),
       ),
+      _ToolCardData(
+        title: "LiteWing Drone",
+        gradientStart: const Color(0xFFF0FDF4),
+        gradientEnd: const Color(0xFFF8FAFC),
+        iconColor: const Color(0xFF0284C7),
+        visualWidget: _buildDroneVisual(),
+        screen: const LiteWingDroneScreen(),
+      ),
     ];
 
     return GridView.builder(
@@ -733,14 +784,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFF1F5F9)),
-              boxShadow: const [
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+              ),
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x080F172A),
+                  color: isDark ? const Color(0x33000000) : const Color(0x080F172A),
                   blurRadius: 16,
-                  offset: Offset(0, 3),
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
@@ -752,7 +805,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [t.gradientStart, t.gradientEnd],
+                        colors: [
+                          isDark ? const Color(0xFF0F172A) : t.gradientStart,
+                          isDark ? const Color(0xFF1E293B) : t.gradientEnd,
+                        ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                       ),
@@ -772,10 +828,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1091,6 +1147,105 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildGyroVisual() {
     return const Icon(Icons.screen_rotation, size: 36, color: Color(0xFF0284C7));
+  }
+
+  Widget _buildDroneVisual() {
+    return SizedBox(
+      width: 50,
+      height: 50,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Transform.rotate(
+            angle: 0.785398,
+            child: Container(
+              width: 42,
+              height: 3.5,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0284C7),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Transform.rotate(
+            angle: -0.785398,
+            child: Container(
+              width: 42,
+              height: 3.5,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0284C7),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 2,
+            top: 2,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF0284C7), width: 1.5),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 2,
+            top: 2,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF0284C7), width: 1.5),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 2,
+            bottom: 2,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF0EA5E9), width: 1.5),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 2,
+            bottom: 2,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF0EA5E9), width: 1.5),
+              ),
+            ),
+          ),
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: const Color(0xFF0284C7),
+              borderRadius: BorderRadius.circular(5),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x330284C7),
+                  blurRadius: 6,
+                ),
+              ],
+            ),
+            child: const Center(
+              child: Icon(Icons.flight, size: 12, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

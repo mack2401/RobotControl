@@ -12,6 +12,16 @@ class SwitchPanelScreen extends StatefulWidget {
 class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
   final RobotState state = RobotState();
 
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get scaffoldBg => isDark ? const Color(0xFF0B0F17) : const Color(0xFFFAF9FA);
+  Color get appBarBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFFAF9FA);
+  Color get cardBg => isDark ? const Color(0xFF1E293B) : Colors.white;
+  Color get cardBorder => isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+  Color get textPrimary => isDark ? Colors.white : const Color(0xFF1B1C1D);
+  Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF5A5F63);
+  Color get subBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFFAF9FA);
+  Color get chipBg => isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+
   // 10 Customizable switch names
   late List<String> switchNames;
 
@@ -54,22 +64,24 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           "Edit Switch ${index + 1} Name",
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
         ),
         content: TextField(
           controller: controller,
           autofocus: true,
+          style: TextStyle(color: textPrimary),
           textCapitalization: TextCapitalization.words,
           decoration: InputDecoration(
             hintText: "Enter switch name",
+            hintStyle: TextStyle(color: textSecondary),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+              borderSide: BorderSide(color: cardBorder),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -84,7 +96,7 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel", style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+            child: Text("Cancel", style: TextStyle(color: textSecondary, fontWeight: FontWeight.w600)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -123,10 +135,10 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9FA),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: const Color(0xFFFAF9FA).withOpacity(0.95),
+        backgroundColor: appBarBg.withOpacity(0.95),
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
           child: InkWell(
@@ -135,7 +147,8 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                color: Colors.white,
+                color: cardBg,
+                border: Border.all(color: cardBorder),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.08),
@@ -144,13 +157,13 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.arrow_back, size: 20, color: Color(0xFF1B1C1D)),
+              child: Icon(Icons.arrow_back, size: 20, color: textPrimary),
             ),
           ),
         ),
-        title: const Text(
+        title: Text(
           'Switch Panel',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B1C1D)),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
         ),
       ),
       body: SafeArea(
@@ -160,14 +173,14 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Top control strip: 10 Relays
-              const Padding(
-                padding: EdgeInsets.only(left: 2, right: 2, bottom: 10),
+              Padding(
+                padding: const EdgeInsets.only(left: 2, right: 2, bottom: 10),
                 child: Text(
                   "10-Channel Relays",
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF475569),
+                    color: textSecondary,
                   ),
                 ),
               ),
@@ -191,8 +204,13 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardBg,
                         borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isChecked
+                              ? (isDark ? const Color(0xFF0D9488) : const Color(0xFF99F6E4))
+                              : cardBorder,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.03),
@@ -213,10 +231,10 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                                     Flexible(
                                       child: Text(
                                         name,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w600,
-                                          color: Color(0xFF1B1C1D),
+                                          color: textPrimary,
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -228,7 +246,7 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.all(3),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFF1F5F9),
+                                          color: chipBg,
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: const Icon(
@@ -247,7 +265,7 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: isChecked ? const Color(0xFF0D9488) : const Color(0xFF434653),
+                                  color: isChecked ? const Color(0xFF14B8A6) : textSecondary,
                                 ),
                               ),
                             ],
@@ -262,7 +280,9 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                                 padding: const EdgeInsets.all(2),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(999),
-                                  color: isChecked ? const Color(0xFF0D9488) : const Color(0xFFE3E2E3),
+                                  color: isChecked
+                                      ? const Color(0xFF0D9488)
+                                      : (isDark ? const Color(0xFF334155) : const Color(0xFFE3E2E3)),
                                 ),
                                 child: AnimatedAlign(
                                   duration: const Duration(milliseconds: 200),

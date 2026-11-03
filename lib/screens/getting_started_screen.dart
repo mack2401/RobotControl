@@ -403,15 +403,27 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
       return matchesCat && matchesSearch;
     }).toList();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDark ? const Color(0xFF0B0F17) : const Color(0xFFFAF9FA);
+    final appBarBg = isDark ? const Color(0xFF0F172A) : const Color(0xE6FAF9FA);
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF334155) : Colors.transparent;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF1B1C1D);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF5A5F63);
+    final searchFill = isDark ? const Color(0xFF1E293B) : const Color(0xFFF5F3F4);
+    final iconBoxBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFD9E2FF);
+    final tagBg = isDark ? const Color(0xFF334155) : const Color(0xFFDFE3E8);
+    final tagText = isDark ? const Color(0xFFE2E8F0) : const Color(0xFF171C20);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9FA),
+      backgroundColor: scaffoldBg,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(64),
         child: Container(
-          decoration: const BoxDecoration(
-            color: Color(0xE6FAF9FA),
+          decoration: BoxDecoration(
+            color: appBarBg,
             boxShadow: [
-              BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 1)),
+              BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.04), blurRadius: 8, offset: const Offset(0, 1)),
             ],
           ),
           child: SafeArea(
@@ -431,16 +443,16 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
                           width: 44,
                           height: 44,
                           decoration: const BoxDecoration(shape: BoxShape.circle),
-                          child: const Icon(Icons.arrow_back, size: 24, color: Color(0xFF1B1C1D)),
+                          child: Icon(Icons.arrow_back, size: 24, color: textPrimary),
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Text(
+                      Text(
                         "User Guide",
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1B1C1D),
+                          color: textPrimary,
                           letterSpacing: -0.3,
                         ),
                       ),
@@ -477,14 +489,14 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
             // Search Input
             TextField(
               controller: _searchController,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF1B1C1D)),
+              style: TextStyle(fontSize: 13, color: textPrimary),
               decoration: InputDecoration(
                 hintText: "Search guide, features, commands...",
-                hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF5A5F63)),
-                prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF094CB2)),
+                hintStyle: TextStyle(fontSize: 13, color: textSecondary),
+                prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF0284C7)),
                 suffixIcon: searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.close, size: 16, color: Color(0xFF5A5F63)),
+                        icon: Icon(Icons.close, size: 16, color: textSecondary),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => searchQuery = '');
@@ -492,10 +504,18 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
                       )
                     : null,
                 filled: true,
-                fillColor: const Color(0xFFF5F3F4),
+                fillColor: searchFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(color: cardBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: cardBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF0284C7), width: 1.5),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 isDense: true,
@@ -509,11 +529,11 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildCategoryChip('all', 'All (13)'),
-                  _buildCategoryChip('controls', 'Controls'),
-                  _buildCategoryChip('hardware', 'Hardware'),
-                  _buildCategoryChip('connectivity', 'Connectivity'),
-                  _buildCategoryChip('troubleshooting', 'Troubleshooting'),
+                  _buildCategoryChip('all', 'All (13)', isDark: isDark),
+                  _buildCategoryChip('controls', 'Controls', isDark: isDark),
+                  _buildCategoryChip('hardware', 'Hardware', isDark: isDark),
+                  _buildCategoryChip('connectivity', 'Connectivity', isDark: isDark),
+                  _buildCategoryChip('troubleshooting', 'Troubleshooting', isDark: isDark),
                 ],
               ),
             ),
@@ -525,10 +545,11 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x06000000), blurRadius: 4, offset: Offset(0, 1)),
+                  border: Border.all(color: cardBorder),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.04), blurRadius: 4, offset: const Offset(0, 1)),
                   ],
                 ),
                 clipBehavior: Clip.antiAlias,
@@ -556,10 +577,10 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
                                     width: 40,
                                     height: 40,
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFD9E2FF),
+                                      color: iconBoxBg,
                                       borderRadius: BorderRadius.circular(10),
                                     ),
-                                    child: Icon(item.icon, size: 22, color: const Color(0xFF094CB2)),
+                                    child: Icon(item.icon, size: 22, color: const Color(0xFF0284C7)),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
@@ -571,10 +592,10 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
                                             Flexible(
                                               child: Text(
                                                 item.title,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF1B1C1D),
+                                                  color: textPrimary,
                                                 ),
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -583,15 +604,15 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFFDFE3E8),
+                                                color: tagBg,
                                                 borderRadius: BorderRadius.circular(4),
                                               ),
                                               child: Text(
                                                 item.tag,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontSize: 9,
                                                   fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF171C20),
+                                                  color: tagText,
                                                 ),
                                               ),
                                             ),
@@ -600,7 +621,7 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
                                         const SizedBox(height: 2),
                                         Text(
                                           item.subtitle,
-                                          style: const TextStyle(fontSize: 11, color: Color(0xFF5A5F63)),
+                                          style: TextStyle(fontSize: 11, color: textSecondary),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -613,7 +634,7 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
                             Icon(
                               isExpanded ? Icons.expand_less : Icons.expand_more,
                               size: 20,
-                              color: const Color(0xFF5A5F63),
+                              color: textSecondary,
                             ),
                           ],
                         ),
@@ -634,10 +655,10 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 40),
                 child: Center(
                   child: Column(
-                    children: const [
-                      Icon(Icons.search_off, size: 40, color: Color(0xFF737784)),
-                      SizedBox(height: 10),
-                      Text("No matching guide topics", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    children: [
+                      Icon(Icons.search_off, size: 40, color: textSecondary),
+                      const SizedBox(height: 10),
+                      Text("No matching guide topics", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrimary)),
                     ],
                   ),
                 ),
@@ -648,7 +669,7 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
     );
   }
 
-  Widget _buildCategoryChip(String catId, String label) {
+  Widget _buildCategoryChip(String catId, String label, {bool isDark = false}) {
     final isSelected = selectedCategory == catId;
     return Padding(
       padding: const EdgeInsets.only(right: 6.0),
@@ -658,15 +679,22 @@ class _GettingStartedScreenState extends State<GettingStartedScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF094CB2) : const Color(0xFFEFEDEE),
+            color: isSelected
+                ? const Color(0xFF0284C7)
+                : (isDark ? const Color(0xFF1E293B) : const Color(0xFFEFEDEE)),
             borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: isSelected ? Colors.transparent : (isDark ? const Color(0xFF334155) : Colors.transparent),
+            ),
           ),
           child: Text(
             label,
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: isSelected ? Colors.white : const Color(0xFF434653),
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF434653)),
             ),
           ),
         ),
@@ -684,6 +712,10 @@ class _StepRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF1B1C1D);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF434653);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -692,7 +724,7 @@ class _StepRow extends StatelessWidget {
           height: 16,
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            color: Color(0xFF094CB2),
+            color: Color(0xFF0284C7),
           ),
           child: Center(
             child: Text(step, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white)),
@@ -702,9 +734,9 @@ class _StepRow extends StatelessWidget {
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: const TextStyle(fontSize: 11, color: Color(0xFF434653)),
+              style: TextStyle(fontSize: 11, color: textSecondary),
               children: [
-                TextSpan(text: '$title ', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1B1C1D))),
+                TextSpan(text: '$title ', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
                 TextSpan(text: desc),
               ],
             ),

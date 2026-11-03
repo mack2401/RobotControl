@@ -32,6 +32,16 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
   String activeDirection = 'S'; // 'F', 'B', 'L', 'R', 'S'
   DateTime _lastHeartbeat = DateTime.now();
 
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get scaffoldBg => isDark ? const Color(0xFF0B0F17) : const Color(0xFFF8FAFC);
+  Color get appBarBg => isDark ? const Color(0xFF0F172A) : Colors.white.withOpacity(0.95);
+  Color get cardBg => isDark ? const Color(0xFF1E293B) : Colors.white;
+  Color get cardBorder => isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+  Color get textPrimary => isDark ? Colors.white : const Color(0xFF0F172A);
+  Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+  Color get subBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+  Color get chipBg => isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+
   @override
   void initState() {
     super.initState();
@@ -141,10 +151,12 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+          color: isSelected
+              ? (isDark ? const Color(0xFF1E3A5F) : const Color(0xFFEFF6FF))
+              : subBg,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0),
+            color: isSelected ? const Color(0xFF0284C7) : cardBorder,
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -155,7 +167,9 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-                color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF475569),
+                color: isSelected
+                    ? (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7))
+                    : textSecondary,
               ),
             ),
             const SizedBox(height: 2),
@@ -165,7 +179,9 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                 fontSize: 10,
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.w600,
-                color: isSelected ? const Color(0xFF0369A1) : const Color(0xFF94A3B8),
+                color: isSelected
+                    ? (isDark ? const Color(0xFF7DD3FC) : const Color(0xFF0369A1))
+                    : textSecondary,
               ),
             ),
           ],
@@ -183,27 +199,28 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
     final isRight = roll > threshold;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white.withOpacity(0.95),
+        backgroundColor: appBarBg,
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
           child: InkWell(
             onTap: () => Navigator.pop(context),
             borderRadius: BorderRadius.circular(999),
             child: Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFFF1F5F9),
+                color: chipBg,
+                border: Border.all(color: cardBorder),
               ),
-              child: const Icon(Icons.arrow_back, size: 20, color: Color(0xFF334155)),
+              child: Icon(Icons.arrow_back, size: 20, color: textPrimary),
             ),
           ),
         ),
-        title: const Text(
+        title: Text(
           'Gyro Control',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textPrimary),
         ),
         actions: [
           Padding(
@@ -226,10 +243,12 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: state.useNumericMotionCommands ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
+                  color: state.useNumericMotionCommands
+                      ? (isDark ? const Color(0xFF1E3A5F) : const Color(0xFFEFF6FF))
+                      : chipBg,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: state.useNumericMotionCommands ? const Color(0xFF3B82F6) : const Color(0xFFE2E8F0),
+                    color: state.useNumericMotionCommands ? const Color(0xFF3B82F6) : cardBorder,
                   ),
                 ),
                 child: Row(
@@ -237,7 +256,9 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                     Icon(
                       state.useNumericMotionCommands ? Icons.pin : Icons.font_download,
                       size: 13,
-                      color: state.useNumericMotionCommands ? const Color(0xFF1D4ED8) : const Color(0xFF475569),
+                      color: state.useNumericMotionCommands
+                          ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8))
+                          : textSecondary,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -245,7 +266,9 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                       style: TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.bold,
-                        color: state.useNumericMotionCommands ? const Color(0xFF1D4ED8) : const Color(0xFF475569),
+                        color: state.useNumericMotionCommands
+                            ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8))
+                            : textSecondary,
                         fontFamily: 'monospace',
                       ),
                     ),
@@ -262,17 +285,17 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: chipBg,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: cardBorder),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.restart_alt, size: 15, color: Color(0xFF475569)),
-                    SizedBox(width: 4),
+                    Icon(Icons.restart_alt, size: 15, color: textPrimary),
+                    const SizedBox(width: 4),
                     Text(
                       'Center All',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textPrimary),
                     ),
                   ],
                 ),
@@ -290,8 +313,9 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cardBorder),
                   boxShadow: [
                     BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8),
                   ],
@@ -315,7 +339,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: isTransmitting ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                            color: isTransmitting ? textPrimary : textSecondary,
                           ),
                         ),
                       ],
@@ -342,8 +366,9 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cardBorder),
                   boxShadow: [
                     BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8),
                   ],
@@ -354,13 +379,13 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.explore, size: 16, color: Color(0xFF94A3B8)),
-                            SizedBox(width: 6),
+                            Icon(Icons.explore, size: 16, color: textSecondary),
+                            const SizedBox(width: 6),
                             Text(
                               'Attitude Matrix (Live IMU)',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textSecondary),
                             ),
                           ],
                         ),
@@ -369,12 +394,12 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: activeDirection == 'S'
-                                ? const Color(0xFFF1F5F9)
-                                : const Color(0xFFE0F2FE),
+                                ? chipBg
+                                : (isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE0F2FE)),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: activeDirection == 'S'
-                                  ? const Color(0xFFCBD5E1)
+                                  ? cardBorder
                                   : const Color(0xFF38BDF8),
                             ),
                           ),
@@ -393,8 +418,8 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                               fontWeight: FontWeight.bold,
                               fontFamily: 'monospace',
                               color: activeDirection == 'S'
-                                  ? const Color(0xFF475569)
-                                  : const Color(0xFF0369A1),
+                                  ? textSecondary
+                                  : const Color(0xFF38BDF8),
                             ),
                           ),
                         ),
@@ -418,7 +443,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                               border: Border.all(
                                 color: activeDirection != 'S'
                                     ? const Color(0xFF38BDF8)
-                                    : const Color(0xFFE2E8F0),
+                                    : cardBorder,
                                 width: 1.5,
                               ),
                             ),
@@ -428,12 +453,12 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                             height: 150,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
+                              border: Border.all(color: cardBorder, width: 1.5),
                             ),
                           ),
                           // Crosshair lines
-                          Container(width: 190, height: 1, color: const Color(0xFFE2E8F0)),
-                          Container(width: 1, height: 190, color: const Color(0xFFE2E8F0)),
+                          Container(width: 190, height: 1, color: cardBorder),
+                          Container(width: 1, height: 190, color: cardBorder),
 
                           // Direction Pointers (Highlight actively triggered directions)
                           Positioned(
@@ -450,7 +475,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                                 style: TextStyle(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w900,
-                                  color: isFwd ? Colors.white : const Color(0xFF94A3B8),
+                                  color: isFwd ? Colors.white : textSecondary,
                                 ),
                               ),
                             ),
@@ -469,7 +494,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                                 style: TextStyle(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w900,
-                                  color: isRev ? Colors.white : const Color(0xFF94A3B8),
+                                  color: isRev ? Colors.white : textSecondary,
                                 ),
                               ),
                             ),
@@ -488,7 +513,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w900,
-                                  color: isLeft ? Colors.white : const Color(0xFF94A3B8),
+                                  color: isLeft ? Colors.white : textSecondary,
                                 ),
                               ),
                             ),
@@ -507,7 +532,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w900,
-                                  color: isRight ? Colors.white : const Color(0xFF94A3B8),
+                                  color: isRight ? Colors.white : textSecondary,
                                 ),
                               ),
                             ),
@@ -611,22 +636,22 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
+                              color: subBg,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: (isFwd || isRev)
                                     ? const Color(0xFF0284C7)
-                                    : Colors.transparent,
+                                    : cardBorder,
                                 width: 1.5,
                               ),
                             ),
                             child: Column(
                               children: [
-                                const Text('Pitch (X)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+                                Text('Pitch (X)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textSecondary)),
                                 const SizedBox(height: 2),
                                 Text(
                                   '${pitch.toStringAsFixed(1)}°',
-                                  style: const TextStyle(fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  style: TextStyle(fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
@@ -634,7 +659,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: (isFwd || isRev) ? const Color(0xFF0284C7) : const Color(0xFF94A3B8),
+                                    color: (isFwd || isRev) ? const Color(0xFF0284C7) : textSecondary,
                                   ),
                                 ),
                               ],
@@ -647,22 +672,22 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
+                              color: subBg,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: (isLeft || isRight)
                                     ? const Color(0xFF4F46E5)
-                                    : Colors.transparent,
+                                    : cardBorder,
                                 width: 1.5,
                               ),
                             ),
                             child: Column(
                               children: [
-                                const Text('Roll (Y)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+                                Text('Roll (Y)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textSecondary)),
                                 const SizedBox(height: 2),
                                 Text(
                                   '${roll >= 0 ? '+' : ''}${roll.toStringAsFixed(1)}°',
-                                  style: const TextStyle(fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  style: TextStyle(fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
@@ -670,7 +695,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: (isLeft || isRight) ? const Color(0xFF4F46E5) : const Color(0xFF94A3B8),
+                                    color: (isLeft || isRight) ? const Color(0xFF4F46E5) : textSecondary,
                                   ),
                                 ),
                               ],
@@ -683,16 +708,17 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
+                              color: subBg,
                               borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: cardBorder),
                             ),
                             child: Column(
                               children: [
-                                const Text('Yaw (Z)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+                                Text('Yaw (Z)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textSecondary)),
                                 const SizedBox(height: 2),
                                 Text(
                                   '${yaw.toStringAsFixed(1)}°',
-                                  style: const TextStyle(fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  style: TextStyle(fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
                                 ),
                                 const SizedBox(height: 2),
                                 const Text('COMPASS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
@@ -711,8 +737,9 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cardBorder),
                   boxShadow: [
                     BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8),
                   ],
@@ -722,25 +749,25 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.tune, size: 18, color: Color(0xFF0284C7)),
-                            SizedBox(width: 8),
+                            const Icon(Icons.tune, size: 18, color: Color(0xFF0284C7)),
+                            const SizedBox(width: 8),
                             Text(
                               'Steering Sensitivity',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary),
                             ),
                           ],
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF0F9FF),
+                            color: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFF0F9FF),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             _sensitivityLabel,
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF38BDF8)),
                           ),
                         ),
                       ],
@@ -757,7 +784,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                         max: 3.0,
                         divisions: 25,
                         activeColor: const Color(0xFF0284C7),
-                        inactiveColor: const Color(0xFFE2E8F0),
+                        inactiveColor: cardBorder,
                         onChanged: (val) => _setSensitivity(val),
                       ),
                     ),
@@ -786,17 +813,18 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
+                          color: chipBg,
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: cardBorder),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.my_location, size: 16, color: Color(0xFF475569)),
-                            SizedBox(width: 8),
+                            Icon(Icons.my_location, size: 16, color: textPrimary),
+                            const SizedBox(width: 8),
                             Text(
                               'Calibrate Neutral Zero',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary),
                             ),
                           ],
                         ),

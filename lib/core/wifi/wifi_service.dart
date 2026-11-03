@@ -78,11 +78,16 @@ class RealWifiNetwork {
     final lower = ssid.toLowerCase();
     return lower.contains("esp32") ||
         lower.contains("esp8266") ||
+        lower.contains("esp") ||
         lower.contains("ibots") ||
         lower.contains("robot") ||
         lower.contains("rover") ||
         lower.contains("relay") ||
-        lower.contains("cam");
+        lower.contains("cam") ||
+        lower.contains("car") ||
+        lower.contains("arm") ||
+        lower.contains("mecanum") ||
+        lower.contains("bot");
   }
 
   bool get is5Ghz => frequency >= 4900;
@@ -151,6 +156,8 @@ class RealWifiService extends ChangeNotifier {
     // Initial check of phone Wi-Fi hardware and connected state
     checkPermissions();
     checkWifiEnabled();
+    checkLocationEnabled();
+    loadSavedNetworks();
     refreshConnectedWifi();
   }
 
@@ -170,6 +177,7 @@ class RealWifiService extends ChangeNotifier {
 
   // Phone native Wi-Fi state (works exactly like phone's Wi-Fi functionality)
   bool isWifiHardwareEnabled = true;
+  bool isLocationEnabled = true;
   bool isPermissionGranted = false;
   bool isScanningNetworks = false;
   ConnectedWifiInfo? currentPhoneWifi;
@@ -238,6 +246,25 @@ class RealWifiService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Check if phone Location Services (GPS) is switched ON (required by Android for Wi-Fi scanning)
+  Future<bool> checkLocationEnabled() async {
+    try {
+      final enabled = await _channel.invokeMethod<bool>('isLocationEnabled') ?? true;
+      isLocationEnabled = enabled;
+      notifyListeners();
+      return enabled;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Open Android's native Location settings screen
+  Future<void> openLocationSettings() async {
+    try {
+      await _channel.invokeMethod('openLocationSettings');
+    } catch (_) {}
+  }
+
   /// Connect directly to a visible Wi-Fi network (Android 10+ WifiNetworkSpecifier / WifiConfiguration)
   Future<bool> connectToNetwork({
     required String ssid,
@@ -301,6 +328,25 @@ class RealWifiService extends ChangeNotifier {
           frequency: (map['frequency'] as num?)?.toInt() ?? 2400,
         );
 
+        // Auto-save the currently connected Wi-Fi network so it immediately appears in Saved Networks
+        final ssid = currentPhoneWifi!.ssid;
+        if (ssid.isNotEmpty && ssid != "<unknown ssid>" && ssid != "0x") {
+          final isEsp = currentPhoneWifi!.isEspHotspot || currentPhoneWifi!.ip.startsWith("192.168.4.");
+          final profile = DeviceProfile(
+            id: "wifi-${ssid.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}",
+            name: ssid,
+            macAddress: currentPhoneWifi!.bssid.isNotEmpty ? currentPhoneWifi!.bssid : "00:00:00:00:00:00",
+            ipAddress: currentPhoneWifi!.gateway.isNotEmpty ? currentPhoneWifi!.gateway : currentPhoneWifi!.ip,
+            protocol: isEsp ? "Wi-Fi (SoftAP)" : "Wi-Fi (LAN)",
+            deviceType: "Rover",
+            lastConnected: DateTime.now(),
+            rssi: currentPhoneWifi!.rssi,
+            isPaired: true,
+          );
+          await DeviceProfileDatabase().saveProfile(profile);
+          await loadSavedNetworks();
+        }
+
         // If phone is connected to an ESP Hotspot or local network gateway, update default IP
         if (currentPhoneWifi!.isEspHotspot && currentPhoneWifi!.gateway.isNotEmpty) {
           currentHost = currentPhoneWifi!.gateway;
@@ -331,6 +377,7 @@ class RealWifiService extends ChangeNotifier {
       }
 
       await checkWifiEnabled();
+      await checkLocationEnabled();
 
       // 2. Request hardware scan
       await _channel.invokeMethod('startScan');
@@ -373,18 +420,6 @@ class RealWifiService extends ChangeNotifier {
         }
       }
 
-      // If no ESP devices are in range, ensure standard ESP access point is discoverable
-      if (!list.any((n) => n.isEspDevice)) {
-        list.add(RealWifiNetwork(
-          ssid: "ESP32_iBots_Robot",
-          bssid: "24:6F:28:B2:1A:40",
-          level: -38,
-          frequency: 2412,
-          capabilities: "[WPA2-PSK-CCMP][ESS]",
-          isSaved: savedNames.contains("esp32_ibots_robot"),
-          isConnected: currentSsid == "ESP32_iBots_Robot",
-        ));
-      }
 
       // Sort: 1. Connected first, 2. ESP Devices second, 3. Saved networks third, 4. Best signal
       list.sort((a, b) {
@@ -407,13 +442,110 @@ class RealWifiService extends ChangeNotifier {
     return availableNetworks;
   }
 
-  /// Load saved Wi-Fi profiles from SQLite database
+  /// Load saved Wi-Fi profiles from SQLite database, phone-configured networks, and connected Wi-Fi
   Future<void> loadSavedNetworks() async {
     try {
       final all = await DeviceProfileDatabase().getAllProfiles();
-      savedWifiProfiles = all.where((p) => p.protocol.contains("Wi-Fi") || p.protocol.contains("WiFi")).toList();
+      final Map<String, DeviceProfile> combined = {};
+
+      for (var p in all) {
+        if (p.protocol.contains("Wi-Fi") || p.protocol.contains("WiFi")) {
+          combined[p.name.toLowerCase()] = p;
+        }
+      }
+
+      // 1. Fetch phone-configured Wi-Fi networks from Android
+      try {
+        final phoneConfigs = await _channel.invokeMethod<List>('getPhoneSavedWifiNetworks') ?? [];
+        for (var item in phoneConfigs) {
+          if (item is Map) {
+            final ssid = item['ssid']?.toString() ?? "";
+            final bssid = item['bssid']?.toString() ?? "00:00:00:00:00:00";
+            if (ssid.isNotEmpty && ssid != "<unknown ssid>" && !combined.containsKey(ssid.toLowerCase())) {
+              final isRobot = ssid.toLowerCase().contains("robot") ||
+                  ssid.toLowerCase().contains("esp") ||
+                  ssid.toLowerCase().contains("rover") ||
+                  ssid.toLowerCase().contains("car") ||
+                  ssid.toLowerCase().contains("bot");
+
+              final profile = DeviceProfile(
+                id: "wifi-${ssid.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}",
+                name: ssid,
+                macAddress: bssid.isNotEmpty ? bssid : "00:00:00:00:00:00",
+                ipAddress: "192.168.4.1",
+                protocol: isRobot ? "Wi-Fi (SoftAP)" : "Wi-Fi (LAN)",
+                deviceType: isRobot ? "Rover" : "Gateway",
+                lastConnected: DateTime.now(),
+                rssi: -50,
+                isPaired: true,
+              );
+              combined[ssid.toLowerCase()] = profile;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint("Error fetching phone saved Wi-Fi: $e");
+      }
+
+      // 2. Ensure iBots-Robot is in saved profiles (user's robot network configured in phone)
+      if (!combined.containsKey("ibots-robot")) {
+        final ibotsProfile = DeviceProfile(
+          id: "wifi-ibots-robot",
+          name: "iBots-Robot",
+          macAddress: "00:00:00:00:00:00",
+          ipAddress: "192.168.4.1",
+          protocol: "Wi-Fi (SoftAP)",
+          deviceType: "Rover",
+          lastConnected: DateTime.now(),
+          rssi: -50,
+          isPaired: true,
+        );
+        combined["ibots-robot"] = ibotsProfile;
+        await DeviceProfileDatabase().saveProfile(ibotsProfile);
+      }
+
+      // 3. If phone is currently connected to a Wi-Fi network, include it in saved profiles
+      if (currentPhoneWifi != null && currentPhoneWifi!.ssid.isNotEmpty && currentPhoneWifi!.ssid != "<unknown ssid>") {
+        final currentSsid = currentPhoneWifi!.ssid;
+        if (!combined.containsKey(currentSsid.toLowerCase())) {
+          final isEsp = currentPhoneWifi!.isEspHotspot || currentPhoneWifi!.ip.startsWith("192.168.4.");
+          final currentNetProfile = DeviceProfile(
+            id: "wifi-${currentSsid.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}",
+            name: currentSsid,
+            macAddress: currentPhoneWifi!.bssid.isNotEmpty ? currentPhoneWifi!.bssid : "00:00:00:00:00:00",
+            ipAddress: currentPhoneWifi!.gateway.isNotEmpty ? currentPhoneWifi!.gateway : currentPhoneWifi!.ip,
+            protocol: isEsp ? "Wi-Fi (SoftAP)" : "Wi-Fi (LAN)",
+            deviceType: "Rover",
+            lastConnected: DateTime.now(),
+            rssi: currentPhoneWifi!.rssi,
+            isPaired: true,
+          );
+          combined[currentSsid.toLowerCase()] = currentNetProfile;
+        }
+      }
+
+      savedWifiProfiles = combined.values.toList();
       notifyListeners();
     } catch (_) {}
+  }
+
+  /// Add a custom saved Wi-Fi network directly
+  Future<void> addCustomSavedNetwork(String ssid, {String ip = "192.168.4.1", bool isSoftAp = true}) async {
+    final cleanSsid = ssid.trim();
+    if (cleanSsid.isEmpty) return;
+    final profile = DeviceProfile(
+      id: "wifi-${cleanSsid.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}",
+      name: cleanSsid,
+      macAddress: "00:00:00:00:00:00",
+      ipAddress: ip,
+      protocol: isSoftAp ? "Wi-Fi (SoftAP)" : "Wi-Fi (LAN)",
+      deviceType: "Rover",
+      lastConnected: DateTime.now(),
+      rssi: -50,
+      isPaired: true,
+    );
+    await DeviceProfileDatabase().saveProfile(profile);
+    await loadSavedNetworks();
   }
 
   /// Save network profile to SQLite
@@ -466,38 +598,52 @@ class RealWifiService extends ChangeNotifier {
 
       final stopwatch = Stopwatch()..start();
 
-      // 1. Try persistent TCP Socket handshake (primary for WiFiServer sketches like server(8080))
-      final tcpSuccess = await _channel.invokeMethod<bool>('connectTcp', {
-        'host': cleanHost,
-        'port': port,
-      }) ?? false;
+      if (port != 80) {
+        // 1. Try persistent TCP Socket handshake (primary for WiFiServer sketches like server(8080))
+        final tcpSuccess = await _channel.invokeMethod<bool>('connectTcp', {
+          'host': cleanHost,
+          'port': port,
+        }) ?? false;
 
-      stopwatch.stop();
+        stopwatch.stop();
 
-      if (tcpSuccess) {
-        status = WifiStatus.connected;
-        currentDeviceName = name ?? (mode == WifiMode.softAp ? "ESP Hotspot ($cleanHost)" : "ESP Node ($cleanHost)");
-        pingMs = stopwatch.elapsedMilliseconds;
-        onDataReceived?.call("[ESP Wi-Fi] Connected to $cleanHost:$port via persistent TCP Socket!");
-        notifyListeners();
-        return true;
-      }
-
-      // 2. If TCP connect didn't succeed, and port is 80, test HTTP REST endpoint
-      if (port == 80) {
-        final uri = Uri.parse("http://$cleanHost:$port/status");
-        try {
-          final request = await _client.getUrl(uri).timeout(const Duration(milliseconds: 2000));
-          final response = await request.close().timeout(const Duration(milliseconds: 2000));
-          final responseBody = await response.transform(utf8.decoder).join();
+        if (tcpSuccess) {
           status = WifiStatus.connected;
           currentDeviceName = name ?? (mode == WifiMode.softAp ? "ESP Hotspot ($cleanHost)" : "ESP Node ($cleanHost)");
           pingMs = stopwatch.elapsedMilliseconds;
-          _parseTelemetryJson(responseBody);
-          _startHeartbeat();
+          onDataReceived?.call("[ESP Wi-Fi] Connected to $cleanHost:$port via persistent TCP Socket!");
+          _saveConnectedProfile(currentDeviceName!, cleanHost, port, mode);
           notifyListeners();
           return true;
-        } catch (_) {}
+        }
+      } else {
+        // 2. For port 80 (HTTP WebServer), verify HTTP endpoint directly without opening raw TCP sockets
+        bool httpOk = false;
+        for (final testPath in ["/", "/status", "/cmd?val=S", "/stop", "/STOP"]) {
+          try {
+            final uri = Uri.parse("http://$cleanHost:$port$testPath");
+            final request = await _client.getUrl(uri).timeout(const Duration(milliseconds: 1200));
+            request.headers.set(HttpHeaders.connectionHeader, "close");
+            final response = await request.close().timeout(const Duration(milliseconds: 1200));
+            await response.drain();
+            if (response.statusCode >= 200 && response.statusCode < 500) {
+              httpOk = true;
+              break;
+            }
+          } catch (_) {}
+        }
+
+        stopwatch.stop();
+
+        if (httpOk) {
+          status = WifiStatus.connected;
+          currentDeviceName = name ?? (mode == WifiMode.softAp ? "ESP Hotspot ($cleanHost)" : "ESP Node ($cleanHost)");
+          pingMs = stopwatch.elapsedMilliseconds > 0 ? stopwatch.elapsedMilliseconds : 12;
+          onDataReceived?.call("[ESP Wi-Fi] Connected to $cleanHost:$port (HTTP WebServer)");
+          _saveConnectedProfile(currentDeviceName!, cleanHost, port, mode);
+          notifyListeners();
+          return true;
+        }
       }
 
       // 3. If phone is currently connected to ESP SoftAP subnet (192.168.4.x), mark connected
@@ -506,6 +652,7 @@ class RealWifiService extends ChangeNotifier {
         currentDeviceName = name ?? (mode == WifiMode.softAp ? "ESP Hotspot ($cleanHost)" : "ESP Node ($cleanHost)");
         pingMs = 12;
         onDataReceived?.call("[ESP Wi-Fi] Connected to $cleanHost:$port (SoftAP Network)");
+        _saveConnectedProfile(currentDeviceName!, cleanHost, port, mode);
         notifyListeners();
         return true;
       }
@@ -515,7 +662,7 @@ class RealWifiService extends ChangeNotifier {
       status = WifiStatus.disconnected;
       pingMs = 0;
       if (mode == WifiMode.softAp) {
-        lastError = "Cannot reach $cleanHost:$port. Ensure phone Wi-Fi is connected to the ESP Hotspot (e.g. '$defaultSoftApSsid') and 'Keep Connected' was selected.";
+        lastError = "Cannot reach $cleanHost:$port. Ensure phone Wi-Fi is connected to the ESP Hotspot and 'Keep Connected' was selected.";
       } else {
         lastError = "Cannot reach $cleanHost:$port. Ensure ESP32 and Phone are on the same Wi-Fi router, or verify the IP address.";
       }
@@ -524,11 +671,33 @@ class RealWifiService extends ChangeNotifier {
     }
   }
 
+  void _saveConnectedProfile(String name, String host, int port, WifiMode mode) {
+    try {
+      final profile = DeviceProfile(
+        id: "wifi-${host.replaceAll('.', '-')}",
+        name: name,
+        macAddress: "IP: $host:$port",
+        ipAddress: host,
+        protocol: mode == WifiMode.softAp ? "Wi-Fi (SoftAP)" : "Wi-Fi (LAN)",
+        deviceType: "Rover",
+        lastConnected: DateTime.now(),
+        rssi: pingMs > 0 ? -40 : -60,
+        isPaired: true,
+      );
+      DeviceProfileDatabase().saveProfile(profile);
+      loadSavedNetworks();
+    } catch (_) {}
+  }
+
   /// Disconnect and stop background polling
   void disconnect() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
     try {
+      _client.close(force: true);
+      _client = HttpClient()
+        ..connectionTimeout = const Duration(milliseconds: 2500)
+        ..idleTimeout = const Duration(seconds: 5);
       _channel.invokeMethod('disconnectTcp');
       _channel.invokeMethod('disconnectWifi');
     } catch (_) {}
@@ -551,7 +720,7 @@ class RealWifiService extends ChangeNotifier {
     // Ensure command always ends with newline so Arduino readStringUntil('\n') receives clean line
     final payloadWithNewline = cmd.endsWith('\n') ? cmd : '$cmd\n';
 
-    // 1. Native method channel: sends over persistent Wi-Fi hardware TCP socket
+    // 1. Native method channel: sends over persistent Wi-Fi hardware HTTP/TCP socket
     try {
       final nativeSuccess = await _channel.invokeMethod<bool>('sendWifiCommand', {
         'host': currentHost,
@@ -560,29 +729,60 @@ class RealWifiService extends ChangeNotifier {
         'path': '/cmd?val=',
       }) ?? false;
       if (nativeSuccess) {
-        onDataReceived?.call("[Wi-Fi TCP] Sent: $trimmedCmd");
+        onDataReceived?.call("[Wi-Fi] Sent: $trimmedCmd");
         return true;
       }
     } catch (_) {}
 
-    // 2. Direct Dart TCP Socket fallback
-    try {
-      final socket = await Socket.connect(currentHost, currentPort, timeout: const Duration(milliseconds: 1500));
-      socket.write(payloadWithNewline);
-      await socket.flush();
-      socket.listen((data) {
-        final resp = utf8.decode(data, allowMalformed: true).trim();
-        if (resp.isNotEmpty) onDataReceived?.call(resp);
-      });
-      Future.delayed(const Duration(milliseconds: 100), () => socket.close());
-      return true;
-    } catch (_) {}
+    // 2. Direct Dart HTTP GET fallback if port is 80 (standard HTTP webserver)
+    if (currentPort == 80) {
+      final upper = trimmedCmd.toUpperCase();
+      final candidateEndpoints = [
+        "/cmd?val=${Uri.encodeComponent(trimmedCmd)}",
+        "/$trimmedCmd",
+        "/${trimmedCmd.toLowerCase()}",
+        if (upper == 'F' || upper == '1' || upper == 'FORWARD') ...["/forward", "/FORWARD", "/action?go=forward"],
+        if (upper == 'B' || upper == '2' || upper == 'BACKWARD') ...["/backward", "/BACKWARD", "/action?go=backward"],
+        if (upper == 'L' || upper == '3' || upper == 'LEFT') ...["/left", "/LEFT", "/action?go=left"],
+        if (upper == 'R' || upper == '4' || upper == 'RIGHT') ...["/right", "/RIGHT", "/action?go=right"],
+        if (upper == 'S' || upper == '0' || upper == 'STOP') ...["/stop", "/STOP", "/action?go=stop"],
+      ];
+      for (final endpoint in candidateEndpoints) {
+        try {
+          final uri = Uri.parse("http://$currentHost:$currentPort$endpoint");
+          final request = await _client.getUrl(uri).timeout(const Duration(milliseconds: 400));
+          request.headers.set(HttpHeaders.connectionHeader, "close");
+          final response = await request.close().timeout(const Duration(milliseconds: 400));
+          await response.drain();
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            onDataReceived?.call("[Wi-Fi HTTP] Sent: $endpoint (HTTP ${response.statusCode})");
+            return true;
+          }
+        } catch (_) {}
+      }
+      return false; // CRITICAL: Never fall through to raw TCP socket on port 80!
+    }
+
+    // 3. Direct Dart TCP Socket fallback for raw TCP ports (e.g. 8080)
+    if (currentPort != 80) {
+      try {
+        final socket = await Socket.connect(currentHost, currentPort, timeout: const Duration(milliseconds: 1500));
+        socket.write(payloadWithNewline);
+        await socket.flush();
+        socket.listen((data) {
+          final resp = utf8.decode(data, allowMalformed: true).trim();
+          if (resp.isNotEmpty) onDataReceived?.call(resp);
+        });
+        Future.delayed(const Duration(milliseconds: 100), () => socket.close());
+        return true;
+      } catch (_) {}
+    }
 
     return false;
   }
 
-  /// Start periodic heartbeat to measure real latency and fetch sensor telemetry
-  void _startHeartbeat() {
+  /// Optional periodic heartbeat to measure real latency and fetch sensor telemetry
+  void startHeartbeat() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(const Duration(milliseconds: 1800), (_) async {
       if (!isConnected) {

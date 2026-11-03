@@ -42,15 +42,26 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDark ? const Color(0xFF0B0F17) : const Color(0xFFFAF9FA);
+    final appBarBg = isDark ? const Color(0xFF0F172A) : const Color(0xE6FAF9FA);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF1B1C1D);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF434653);
+    final cardBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF5F3F4);
+    final inputBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final inputBorder = isDark ? const Color(0xFF334155) : Colors.transparent;
+    final hintColor = isDark ? const Color(0xFF64748B) : const Color(0xFF5A5F63);
+    final iconColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF5A5F63);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9FA),
+      backgroundColor: scaffoldBg,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(64),
         child: Container(
-          decoration: const BoxDecoration(
-            color: Color(0xE6FAF9FA),
+          decoration: BoxDecoration(
+            color: appBarBg,
             boxShadow: [
-              BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 1)),
+              BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.04), blurRadius: 8, offset: const Offset(0, 1)),
             ],
           ),
           child: SafeArea(
@@ -70,7 +81,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                           width: 44,
                           height: 44,
                           decoration: const BoxDecoration(shape: BoxShape.circle),
-                          child: const Icon(Icons.arrow_back, size: 24, color: Color(0xFF1B1C1D)),
+                          child: Icon(Icons.arrow_back, size: 24, color: textPrimary),
                         ),
                       ),
                       Image.network(
@@ -91,27 +102,28 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFD9E2FF),
+                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFD9E2FF),
                           borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.transparent),
                         ),
                         child: const Text(
                           "IBOTS",
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF094CB2),
+                            color: Color(0xFF38BDF8),
                             letterSpacing: 0.5,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const Text(
+                  Text(
                     "Contact Support",
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1B1C1D),
+                      color: textPrimary,
                     ),
                   ),
                   InkWell(
@@ -146,39 +158,40 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F3F4),
+                color: cardBg,
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.transparent),
               ),
               child: Row(
                 children: [
                   Container(
                     width: 48,
                     height: 48,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFD9E2FF),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFD9E2FF),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.headset_mic, size: 26, color: Color(0xFF094CB2)),
+                    child: const Icon(Icons.headset_mic, size: 26, color: Color(0xFF0284C7)),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Text(
                           "Need help?",
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1B1C1D),
+                            color: textPrimary,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           "Contact our support team for questions, diagnostic guidance, or feedback.",
                           style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF434653),
+                            color: textSecondary,
                             height: 1.4,
                           ),
                         ),
@@ -198,39 +211,39 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Name Field
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4, bottom: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 6),
                       child: Text(
                         "NAME",
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF434653),
+                          color: textSecondary,
                           letterSpacing: 0.8,
                         ),
                       ),
                     ),
                     TextFormField(
                       controller: _nameController,
-                      style: const TextStyle(fontSize: 14, color: Color(0xFF1B1C1D)),
+                      style: TextStyle(fontSize: 14, color: textPrimary),
                       decoration: InputDecoration(
                         hintText: "Enter your full name",
-                        hintStyle: const TextStyle(color: Color(0xFF5A5F63), fontSize: 13),
-                        prefixIcon: const Icon(Icons.person, color: Color(0xFF5A5F63), size: 20),
+                        hintStyle: TextStyle(color: hintColor, fontSize: 13),
+                        prefixIcon: Icon(Icons.person, color: iconColor, size: 20),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: inputBg,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(9999),
-                          borderSide: BorderSide.none,
+                          borderSide: BorderSide(color: inputBorder),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(9999),
-                          borderSide: BorderSide.none,
+                          borderSide: BorderSide(color: inputBorder),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(9999),
-                          borderSide: const BorderSide(color: Color(0xFF094CB2), width: 1.5),
+                          borderSide: const BorderSide(color: Color(0xFF0284C7), width: 1.5),
                         ),
                       ),
                       validator: (val) {
@@ -241,14 +254,14 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     const SizedBox(height: 16),
 
                     // Email Field
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4, bottom: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 6),
                       child: Text(
                         "EMAIL",
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF434653),
+                          color: textSecondary,
                           letterSpacing: 0.8,
                         ),
                       ),
@@ -256,25 +269,25 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      style: const TextStyle(fontSize: 14, color: Color(0xFF1B1C1D)),
+                      style: TextStyle(fontSize: 14, color: textPrimary),
                       decoration: InputDecoration(
                         hintText: "Enter your email address",
-                        hintStyle: const TextStyle(color: Color(0xFF5A5F63), fontSize: 13),
-                        prefixIcon: const Icon(Icons.mail, color: Color(0xFF5A5F63), size: 20),
+                        hintStyle: TextStyle(color: hintColor, fontSize: 13),
+                        prefixIcon: Icon(Icons.mail, color: iconColor, size: 20),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: inputBg,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(9999),
-                          borderSide: BorderSide.none,
+                          borderSide: BorderSide(color: inputBorder),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(9999),
-                          borderSide: BorderSide.none,
+                          borderSide: BorderSide(color: inputBorder),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(9999),
-                          borderSide: const BorderSide(color: Color(0xFF094CB2), width: 1.5),
+                          borderSide: const BorderSide(color: Color(0xFF0284C7), width: 1.5),
                         ),
                       ),
                       validator: (val) {
@@ -286,14 +299,14 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     const SizedBox(height: 16),
 
                     // Message Field
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4, bottom: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 6),
                       child: Text(
                         "MESSAGE",
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF434653),
+                          color: textSecondary,
                           letterSpacing: 0.8,
                         ),
                       ),
@@ -301,24 +314,24 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     TextFormField(
                       controller: _messageController,
                       maxLines: 5,
-                      style: const TextStyle(fontSize: 14, color: Color(0xFF1B1C1D)),
+                      style: TextStyle(fontSize: 14, color: textPrimary),
                       decoration: InputDecoration(
                         hintText: "Describe your issue or question...",
-                        hintStyle: const TextStyle(color: Color(0xFF5A5F63), fontSize: 13),
+                        hintStyle: TextStyle(color: hintColor, fontSize: 13),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: inputBg,
                         contentPadding: const EdgeInsets.all(16),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
+                          borderSide: BorderSide(color: inputBorder),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
+                          borderSide: BorderSide(color: inputBorder),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFF094CB2), width: 1.5),
+                          borderSide: const BorderSide(color: Color(0xFF0284C7), width: 1.5),
                         ),
                       ),
                       validator: (val) {
@@ -334,15 +347,15 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       height: 50,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF094CB2),
+                          backgroundColor: const Color(0xFF0284C7),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
                           elevation: 2,
                         ),
                         onPressed: _submitForm,
-                        child: Row(
+                        child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
+                          children: [
                             Text(
                               "Send Message",
                               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
@@ -362,10 +375,11 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4)),
+                  border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.transparent),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.04), blurRadius: 10, offset: const Offset(0, 4)),
                   ],
                 ),
                 child: Column(
@@ -373,37 +387,37 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     Container(
                       width: 56,
                       height: 56,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFD9E2FF),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFD9E2FF),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.check_circle, size: 32, color: Color(0xFF094CB2)),
+                      child: const Icon(Icons.check_circle, size: 32, color: Color(0xFF0284C7)),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       "Message Sent!",
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1B1C1D),
+                        color: textPrimary,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       "Thank you for reaching out. We have received your inquiry and will get back to you soon.",
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
-                        color: Color(0xFF434653),
+                        color: textSecondary,
                         height: 1.4,
                       ),
                     ),
                     const SizedBox(height: 20),
                     OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE9E8E9),
-                        foregroundColor: const Color(0xFF094CB2),
-                        side: BorderSide.none,
+                        backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFE9E8E9),
+                        foregroundColor: const Color(0xFF38BDF8),
+                        side: BorderSide(color: isDark ? const Color(0xFF334155) : BorderSide.none.color),
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
                       ),
@@ -422,14 +436,14 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
             // Editorial Assurance Note
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.verified_user, size: 16, color: Color(0xFF5A5F63)),
-                SizedBox(width: 6),
+              children: [
+                Icon(Icons.verified_user, size: 16, color: iconColor),
+                const SizedBox(width: 6),
                 Text(
                   "Dedicated technical response directly to your inbox",
                   style: TextStyle(
                     fontSize: 11,
-                    color: Color(0xFF5A5F63),
+                    color: textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

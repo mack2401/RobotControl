@@ -239,10 +239,11 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
   }
 
   void _openVoiceCommandsModal() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Container(
           width: 340,
@@ -258,16 +259,20 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                       Container(
                         width: 28,
                         height: 28,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Color(0xFFF0F9FF),
+                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF0F9FF),
                         ),
                         child: const Icon(Icons.record_voice_over, size: 16, color: Color(0xFF0284C7)),
                       ),
                       const SizedBox(width: 8),
-                      const Text(
+                      Text(
                         'Voice Command Library',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
                       ),
                     ],
                   ),
@@ -277,11 +282,11 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                     child: Container(
                       width: 28,
                       height: 28,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Color(0xFFF1F5F9),
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                       ),
-                      child: const Icon(Icons.close, size: 16, color: Color(0xFF64748B)),
+                      child: Icon(Icons.close, size: 16, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                     ),
                   ),
                 ],
@@ -292,19 +297,19 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                      _buildCmdRow('“Forward” / “Move forward”', Icons.arrow_upward, const Color(0xFF0284C7), 'F'),
-                      _buildCmdRow('“Backward” / “Reverse”', Icons.arrow_downward, const Color(0xFF0284C7), 'B'),
-                      _buildCmdRow('“Turn left” / “Left”', Icons.turn_left, const Color(0xFF0284C7), 'L'),
-                      _buildCmdRow('“Turn right” / “Right”', Icons.turn_right, const Color(0xFF0284C7), 'R'),
-                      _buildCmdRow('“Stop” / “Halt” / “Brake”', Icons.stop_circle, const Color(0xFFE11D48), 'S', isAlert: true),
-                      _buildCmdRow('“Turn on lights” / “Light on”', Icons.lightbulb, const Color(0xFFF59E0B), '1'),
-                      _buildCmdRow('“Turn off lights” / “Light off”', Icons.lightbulb_outline, const Color(0xFF94A3B8), '0'),
-                      _buildCmdRow('“RGB lamp on” / “RGB lights on”', Icons.flare, const Color(0xFF8B5CF6), 'RGB_POWER:1'),
-                      _buildCmdRow('“RGB lamp off” / “RGB lights off”', Icons.flare_outlined, const Color(0xFF64748B), 'RGB_POWER:0'),
-                      _buildCmdRow('“Horn” / “Honk” / “Beep”', Icons.volume_up, const Color(0xFF10B981), 'H'),
-                      _buildCmdRow('“Start dance mode”', Icons.celebration, const Color(0xFF8B5CF6), 'X'),
-                      _buildCmdRow('“Fast” / “Full speed”', Icons.speed, const Color(0xFF0284C7), 'SPEED:100'),
-                      _buildCmdRow('“Slow” / “Half speed”', Icons.slow_motion_video, const Color(0xFF64748B), 'SPEED:50'),
+                      _buildCmdRow('“Forward” / “Move forward”', Icons.arrow_upward, const Color(0xFF0284C7), 'F', isDark: isDark),
+                      _buildCmdRow('“Backward” / “Reverse”', Icons.arrow_downward, const Color(0xFF0284C7), 'B', isDark: isDark),
+                      _buildCmdRow('“Turn left” / “Left”', Icons.turn_left, const Color(0xFF0284C7), 'L', isDark: isDark),
+                      _buildCmdRow('“Turn right” / “Right”', Icons.turn_right, const Color(0xFF0284C7), 'R', isDark: isDark),
+                      _buildCmdRow('“Stop” / “Halt” / “Brake”', Icons.stop_circle, const Color(0xFFE11D48), 'S', isAlert: true, isDark: isDark),
+                      _buildCmdRow('“Turn on lights” / “Light on”', Icons.lightbulb, const Color(0xFFF59E0B), '1', isDark: isDark),
+                      _buildCmdRow('“Turn off lights” / “Light off”', Icons.lightbulb_outline, const Color(0xFF94A3B8), '0', isDark: isDark),
+                      _buildCmdRow('“RGB lamp on” / “RGB lights on”', Icons.flare, const Color(0xFF8B5CF6), 'RGB_POWER:1', isDark: isDark),
+                      _buildCmdRow('“RGB lamp off” / “RGB lights off”', Icons.flare_outlined, const Color(0xFF64748B), 'RGB_POWER:0', isDark: isDark),
+                      _buildCmdRow('“Horn” / “Honk” / “Beep”', Icons.volume_up, const Color(0xFF10B981), 'H', isDark: isDark),
+                      _buildCmdRow('“Start dance mode”', Icons.celebration, const Color(0xFF8B5CF6), 'X', isDark: isDark),
+                      _buildCmdRow('“Fast” / “Full speed”', Icons.speed, const Color(0xFF0284C7), 'SPEED:100', isDark: isDark),
+                      _buildCmdRow('“Slow” / “Half speed”', Icons.slow_motion_video, const Color(0xFF64748B), 'SPEED:50', isDark: isDark),
                     ],
                   ),
                 ),
@@ -314,7 +319,7 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F172A),
+                    backgroundColor: isDark ? const Color(0xFF0284C7) : const Color(0xFF0F172A),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -330,14 +335,20 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
     );
   }
 
-  Widget _buildCmdRow(String text, IconData icon, Color iconColor, String code, {bool isAlert = false}) {
+  Widget _buildCmdRow(String text, IconData icon, Color iconColor, String code, {bool isAlert = false, bool isDark = false}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isAlert ? const Color(0xFFFFF1F2) : const Color(0xFFF8FAFC),
+        color: isAlert
+            ? (isDark ? const Color(0xFF3B1219) : const Color(0xFFFFF1F2))
+            : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isAlert ? const Color(0xFFFECDD3) : const Color(0xFFF1F5F9)),
+        border: Border.all(
+          color: isAlert
+              ? (isDark ? const Color(0xFF881337) : const Color(0xFFFECDD3))
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -353,7 +364,9 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: isAlert ? const Color(0xFFBE123C) : const Color(0xFF1E293B),
+                      color: isAlert
+                          ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFBE123C))
+                          : (isDark ? Colors.white : const Color(0xFF1E293B)),
                     ),
                   ),
                 ),
@@ -363,17 +376,17 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
             ),
             child: Text(
               code,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF475569),
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
               ),
             ),
           ),
@@ -385,33 +398,41 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
   @override
   Widget build(BuildContext context) {
     final isConnected = state.currentDevice.isConnected;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDark ? const Color(0xFF0B0F17) : const Color(0xFFFAF9FA);
+    final appBarBg = isDark ? const Color(0xFF0B0F17) : const Color(0xFFFAF9FA).withOpacity(0.95);
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final backBtnBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFEFEDEE);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9FA),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: const Color(0xFFFAF9FA).withOpacity(0.95),
+        backgroundColor: appBarBg,
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
           child: InkWell(
             onTap: () => Navigator.pop(context),
             borderRadius: BorderRadius.circular(999),
             child: Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFFEFEDEE),
+                color: backBtnBg,
               ),
-              child: const Icon(Icons.arrow_back, size: 20, color: Color(0xFF1B1C1D)),
+              child: Icon(Icons.arrow_back, size: 20, color: textPrimary),
             ),
           ),
         ),
-        title: const Text(
+        title: Text(
           'Voice Control',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textPrimary),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.info_outline, size: 22, color: Color(0xFF334155)),
+            icon: Icon(Icons.info_outline, size: 22, color: textSecondary),
             onPressed: _openVoiceCommandsModal,
             tooltip: "Voice Commands",
           ),
@@ -429,10 +450,14 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isConnected ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
+                    color: isConnected
+                        ? (isDark ? const Color(0xFF052E16) : const Color(0xFFF0FDF4))
+                        : (isDark ? const Color(0xFF451A03) : const Color(0xFFFFFBEB)),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isConnected ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A),
+                      color: isConnected
+                          ? (isDark ? const Color(0xFF166534) : const Color(0xFFBBF7D0))
+                          : (isDark ? const Color(0xFF92400E) : const Color(0xFFFDE68A)),
                     ),
                   ),
                   child: Row(
@@ -441,7 +466,9 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                       Icon(
                         isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
                         size: 16,
-                        color: isConnected ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                        color: isConnected
+                            ? (isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A))
+                            : (isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706)),
                       ),
                       const SizedBox(width: 8),
                       Flexible(
@@ -452,7 +479,9 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: isConnected ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                            color: isConnected
+                                ? (isDark ? const Color(0xFF4ADE80) : const Color(0xFF15803D))
+                                : (isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309)),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -469,14 +498,20 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
                     decoration: BoxDecoration(
-                      color: isListening ? const Color(0xFFFEF2F2) : Colors.white,
+                      color: isListening
+                          ? (isDark ? const Color(0xFF450A0A) : const Color(0xFFFEF2F2))
+                          : cardBg,
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(
-                        color: isListening ? const Color(0xFFFCA5A5) : const Color(0xFFF1F5F9),
+                        color: isListening
+                            ? const Color(0xFFEF4444)
+                            : cardBorder,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: isListening ? const Color(0xFFEF4444).withOpacity(0.2) : Colors.black.withOpacity(0.04),
+                          color: isListening
+                              ? const Color(0xFFEF4444).withOpacity(0.2)
+                              : Colors.black.withOpacity(isDark ? 0.2 : 0.04),
                           blurRadius: isListening ? 14 : 10,
                           offset: const Offset(0, 4),
                         ),
@@ -502,7 +537,7 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 1.2,
-                            color: isListening ? const Color(0xFFEF4444) : const Color(0xFF334155),
+                            color: isListening ? const Color(0xFFF87171) : textSecondary,
                           ),
                         ),
                       ],
@@ -549,14 +584,14 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                     height: 190,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isListening ? const Color(0xFF0284C7) : Colors.white,
+                      color: isListening ? const Color(0xFF0284C7) : cardBg,
                       border: Border.all(
-                        color: isListening ? const Color(0xFF38BDF8) : const Color(0xFFE2E8F0),
+                        color: isListening ? const Color(0xFF38BDF8) : cardBorder,
                         width: isListening ? 4 : 1,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0284C7).withOpacity(isListening ? 0.35 : 0.08),
+                          color: const Color(0xFF0284C7).withOpacity(isListening ? 0.35 : (isDark ? 0.15 : 0.08)),
                           blurRadius: isListening ? 40 : 20,
                           spreadRadius: isListening ? 8 : 0,
                           offset: const Offset(0, 8),
@@ -567,7 +602,7 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                       child: Icon(
                         Icons.mic,
                         size: 68,
-                        color: isListening ? Colors.white : const Color(0xFF0F172A),
+                        color: isListening ? Colors.white : textPrimary,
                       ),
                     ),
                   ),
@@ -579,12 +614,12 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardBg,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: cardBorder),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.02),
+                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
@@ -592,13 +627,13 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                   ),
                   child: Column(
                     children: [
-                      const Text(
+                      Text(
                         'SPEECH TRANSCRIPT',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.1,
-                          color: Color(0xFF64748B),
+                          color: textSecondary,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -611,8 +646,8 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: recognizedText.isEmpty
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF0F172A),
+                              ? textSecondary
+                              : textPrimary,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -621,9 +656,9 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5),
+                            color: isDark ? const Color(0xFF052E16) : const Color(0xFFECFDF5),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                            border: Border.all(color: isDark ? const Color(0xFF166534) : const Color(0xFFA7F3D0)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -632,10 +667,10 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                               const SizedBox(width: 6),
                               Text(
                                 'Executed: $lastExecutedAction',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF047857),
+                                  color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF047857),
                                 ),
                               ),
                             ],
@@ -646,21 +681,21 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFFBEB),
+                            color: isDark ? const Color(0xFF451A03) : const Color(0xFFFFFBEB),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFFDE68A)),
+                            border: Border.all(color: isDark ? const Color(0xFF92400E) : const Color(0xFFFDE68A)),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.help_outline, size: 14, color: Color(0xFFD97706)),
-                              SizedBox(width: 6),
+                              const Icon(Icons.help_outline, size: 14, color: Color(0xFFD97706)),
+                              const SizedBox(width: 6),
                               Text(
                                 'Unrecognized command. Tap (i) for examples.',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFFB45309),
+                                  color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
                                 ),
                               ),
                             ],
@@ -676,9 +711,9 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFEF2F2),
+                      color: isDark ? const Color(0xFF450A0A) : const Color(0xFFFEF2F2),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFFECDD3)),
+                      border: Border.all(color: isDark ? const Color(0xFF991B1B) : const Color(0xFFFECDD3)),
                     ),
                     child: Row(
                       children: [
@@ -687,7 +722,10 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                         Expanded(
                           child: Text(
                             errorMessage!,
-                            style: const TextStyle(fontSize: 11, color: Color(0xFFB91C1C)),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+                            ),
                           ),
                         ),
                       ],
@@ -702,13 +740,13 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
                   runSpacing: 8,
                   alignment: WrapAlignment.center,
                   children: [
-                    _buildQuickChip("Forward", Icons.arrow_upward),
-                    _buildQuickChip("Stop", Icons.stop),
-                    _buildQuickChip("Lights On", Icons.lightbulb),
-                    _buildQuickChip("Lights Off", Icons.lightbulb_outline),
-                    _buildQuickChip("RGB Lamp On", Icons.flare),
-                    _buildQuickChip("RGB Lamp Off", Icons.flare_outlined),
-                    _buildQuickChip("Dance", Icons.celebration),
+                    _buildQuickChip("Forward", Icons.arrow_upward, isDark: isDark),
+                    _buildQuickChip("Stop", Icons.stop, isDark: isDark),
+                    _buildQuickChip("Lights On", Icons.lightbulb, isDark: isDark),
+                    _buildQuickChip("Lights Off", Icons.lightbulb_outline, isDark: isDark),
+                    _buildQuickChip("RGB Lamp On", Icons.flare, isDark: isDark),
+                    _buildQuickChip("RGB Lamp Off", Icons.flare_outlined, isDark: isDark),
+                    _buildQuickChip("Dance", Icons.celebration, isDark: isDark),
                   ],
                 ),
               ],
@@ -719,17 +757,21 @@ class _VoiceControlScreenState extends State<VoiceControlScreen> with SingleTick
     );
   }
 
-  Widget _buildQuickChip(String label, IconData icon) {
+  Widget _buildQuickChip(String label, IconData icon, {bool isDark = false}) {
     return ActionChip(
       avatar: Icon(icon, size: 14, color: const Color(0xFF0284C7)),
       label: Text(
         label,
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: isDark ? Colors.white : const Color(0xFF334155),
+        ),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
       onPressed: () {
         setState(() {

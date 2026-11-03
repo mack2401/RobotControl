@@ -3,6 +3,7 @@ import '../core/state/robot_state.dart';
 import '../core/database/device_database.dart';
 import '../core/wifi/wifi_service.dart';
 import 'wifi_connect_dialog.dart';
+import 'wifi_mode_info_dialog.dart';
 
 class DeviceDiscoverySheet extends StatefulWidget {
   final String protocol;
@@ -27,11 +28,34 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
   int _wifiTab = 0; // 0 = Hotspot (SoftAP), 1 = Local Network (Router)
   final TextEditingController _ipController = TextEditingController(text: "192.168.1.100");
   final TextEditingController _portController = TextEditingController(text: "80");
+  bool _filterOnlyRobots = true;
 
   @override
   void initState() {
     super.initState();
     state.addListener(_onStateChanged);
+    state.wifiService.addListener(_onStateChanged);
+
+    // If connected to ESP SoftAP, default to Mode 2; otherwise default to Mode 1 (Local Router Network)
+    final phoneWifi = state.wifiService.currentPhoneWifi;
+    if (state.wifiService.isConnected && state.wifiService.currentMode == WifiMode.softAp) {
+      _wifiTab = 1;
+    } else if (phoneWifi != null && (phoneWifi.isEspHotspot || phoneWifi.ip.startsWith("192.168.4."))) {
+      _wifiTab = 1;
+    } else {
+      _wifiTab = 0; // Mode 1: Local Network
+    }
+
+    if (state.wifiService.currentHost.isNotEmpty && state.wifiService.currentHost != "192.168.4.1") {
+      _ipController.text = state.wifiService.currentHost;
+      _portController.text = state.wifiService.currentPort.toString();
+    } else if (phoneWifi != null && phoneWifi.ip.contains('.')) {
+      final parts = phoneWifi.ip.split('.');
+      if (parts.length == 4) {
+        _ipController.text = "${parts[0]}.${parts[1]}.${parts[2]}.";
+      }
+    }
+
     _radarController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -48,8 +72,18 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
     _ipController.dispose();
     _portController.dispose();
     state.removeListener(_onStateChanged);
+    state.wifiService.removeListener(_onStateChanged);
     super.dispose();
   }
+
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get sheetBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+  Color get cardBg => isDark ? const Color(0xFF1E293B) : Colors.white;
+  Color get cardBorder => isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+  Color get textPrimary => isDark ? Colors.white : const Color(0xFF0F172A);
+  Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+  Color get subBg => isDark ? const Color(0xFF0B0F17) : const Color(0xFFF8FAFC);
+  Color get chipBg => isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
 
   void _onStateChanged() {
     if (mounted) setState(() {});
@@ -103,12 +137,16 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
       }
     }
 
+    final nearbyDiscovered = _filterOnlyRobots
+        ? state.nearbyDiscoveredDevices.where((d) => d.isRobotDevice).toList()
+        : state.nearbyDiscoveredDevices;
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        boxShadow: [
+      decoration: BoxDecoration(
+        color: sheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        boxShadow: const [
           BoxShadow(
             color: Color(0x33000000),
             blurRadius: 24,
@@ -124,7 +162,7 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
             width: 44,
             height: 4,
             decoration: BoxDecoration(
-              color: const Color(0xFFCBD5E1),
+              color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
               borderRadius: BorderRadius.circular(4),
             ),
           ),
@@ -142,9 +180,9 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE0F2FE),
+                        color: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE0F2FE),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFBAE6FD)),
+                        border: Border.all(color: isDark ? const Color(0xFF0369A1) : const Color(0xFFBAE6FD)),
                       ),
                       child: Icon(
                         isWifi ? Icons.wifi : Icons.bluetooth,
@@ -158,17 +196,17 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
+                            color: textPrimary,
                           ),
                         ),
                         Text(
                           state.isRadioEnabled ? "Discoverable as mobile phone" : "Radio is turned OFF",
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF64748B),
+                            color: textSecondary,
                           ),
                         ),
                       ],
@@ -186,12 +224,12 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
           ),
 
           const SizedBox(height: 14),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          Divider(height: 1, color: cardBorder),
 
           // Scan status banner
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            color: Colors.white,
+            color: cardBg,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -203,14 +241,14 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                         child: const Icon(Icons.sync, size: 16, color: Color(0xFF0284C7)),
                       )
                     else
-                      const Icon(Icons.radar, size: 16, color: Color(0xFF64748B)),
+                      Icon(Icons.radar, size: 16, color: textSecondary),
                     const SizedBox(width: 8),
                     Text(
                       state.isScanning ? "Scanning nearby ${isWifi ? 'networks' : 'devices'}..." : "Scan completed",
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: state.isScanning ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                        color: state.isScanning ? const Color(0xFF0284C7) : textSecondary,
                       ),
                     ),
                   ],
@@ -227,7 +265,7 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          Divider(height: 1, color: cardBorder),
 
           // Scrollable Device Lists
           Expanded(
@@ -251,14 +289,14 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: cardBg,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: cardBorder),
                     ),
-                    child: const Text(
+                    child: Text(
                       "No saved profiles found in SQLite for this protocol.\nConnect to a nearby device to save its profile.",
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                      style: TextStyle(fontSize: 12, color: textSecondary),
                     ),
                   )
                 else
@@ -269,12 +307,12 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardBg,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isLiveConnected
                               ? const Color(0xFF10B981)
-                              : (isSelectedTarget ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0)),
+                              : (isSelectedTarget ? const Color(0xFF0284C7) : cardBorder),
                           width: (isLiveConnected || isSelectedTarget) ? 1.5 : 1,
                         ),
                         boxShadow: const [
@@ -287,12 +325,16 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: isLiveConnected ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                            color: isLiveConnected
+                                ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
+                                : chipBg,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
                             _getDeviceIcon(profile.deviceType),
-                            color: isLiveConnected ? const Color(0xFF059669) : const Color(0xFF475569),
+                            color: isLiveConnected
+                                ? const Color(0xFF10B981)
+                                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
                             size: 20,
                           ),
                         ),
@@ -301,29 +343,41 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                             Flexible(
                               child: Text(
                                 profile.name,
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            if (profile.isRobotDevice) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: isDark ? const Color(0xFFB45309) : const Color(0xFFFDE68A)),
+                                ),
+                                child: Text("★ ROBOT", style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))),
+                              ),
+                            ],
                             if (isLiveConnected) ...[
                               const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFECFDF5),
+                                  color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(color: const Color(0xFFA7F3D0)),
                                 ),
-                                child: const Text("CONNECTED", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                                child: const Text("CONNECTED", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
                               ),
                             ] else if (isSelectedTarget) ...[
                               const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFE0F2FE),
+                                  color: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE0F2FE),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: const Color(0xFFBAE6FD)),
+                                  border: Border.all(color: isDark ? const Color(0xFF0284C7) : const Color(0xFFBAE6FD)),
                                 ),
                                 child: const Text("TARGET", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
                               ),
@@ -336,11 +390,11 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                             const SizedBox(height: 2),
                             Text(
                               "${profile.macAddress} • Saved Profile",
-                              style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF64748B)),
+                              style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: textSecondary),
                             ),
                             Text(
                               "Last sync: ${_formatDateTime(profile.lastConnected)}",
-                              style: const TextStyle(fontSize: 9, color: Color(0xFF94A3B8)),
+                              style: TextStyle(fontSize: 9, color: textSecondary.withOpacity(0.8)),
                             ),
                           ],
                         ),
@@ -349,7 +403,7 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                           children: [
                             IconButton(
                               tooltip: "Forget Profile",
-                              icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFF94A3B8)),
+                              icon: Icon(Icons.delete_outline, size: 18, color: textSecondary),
                               onPressed: () {
                                 state.forgetDevice(profile.id);
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -368,7 +422,7 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: isSelectedTarget ? const Color(0xFF0284C7) : const Color(0xFFF1F5F9),
+                                  color: isSelectedTarget ? const Color(0xFF0284C7) : chipBg,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
@@ -376,7 +430,7 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: isSelectedTarget ? Colors.white : const Color(0xFF475569),
+                                    color: isSelectedTarget ? Colors.white : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
                                   ),
                                 ),
                               ),
@@ -399,21 +453,107 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                 // SECTION 2: AVAILABLE DEVICES NEARBY (Discovered)
                 _buildSectionHeader(
                   title: "AVAILABLE DEVICES NEARBY",
-                  count: state.nearbyDiscoveredDevices.length,
+                  count: nearbyDiscovered.length,
                   badge: "In Range",
+                  trailing: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _filterOnlyRobots = !_filterOnlyRobots;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _filterOnlyRobots
+                            ? (isDark ? const Color(0xFF1E3A5F) : const Color(0xFFEFF6FF))
+                            : chipBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _filterOnlyRobots ? const Color(0xFF0284C7) : cardBorder,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _filterOnlyRobots ? Icons.filter_alt : Icons.filter_alt_outlined,
+                            size: 11,
+                            color: _filterOnlyRobots ? const Color(0xFF38BDF8) : textSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _filterOnlyRobots ? "Only Robots" : "All Devices",
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: _filterOnlyRobots ? const Color(0xFF38BDF8) : textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 8),
-                ...state.nearbyDiscoveredDevices.map((dev) {
-                  final isSelectedTarget = target.id == dev.id;
-                  final isLiveConnected = state.currentDevice.id == dev.id && state.currentDevice.isConnected;
+                if (nearbyDiscovered.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: cardBorder),
+                    ),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(
+                            state.isScanning
+                                ? Icons.radar
+                                : (_filterOnlyRobots && state.nearbyDiscoveredDevices.isNotEmpty
+                                    ? Icons.filter_alt_off
+                                    : Icons.bluetooth_searching),
+                            size: 32,
+                            color: state.isScanning ? const Color(0xFF0284C7) : textSecondary,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            state.isScanning
+                                ? "Scanning for nearby devices in range..."
+                                : (_filterOnlyRobots && state.nearbyDiscoveredDevices.isNotEmpty
+                                    ? "No Robot Bluetooth modules detected in scan.\nTap 'Show All' to view ${state.nearbyDiscoveredDevices.length} other devices."
+                                    : "No nearby devices discovered.\nTap 'Scan Again' to search for active devices."),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: textSecondary),
+                          ),
+                          if (_filterOnlyRobots && state.nearbyDiscoveredDevices.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _filterOnlyRobots = false;
+                                });
+                              },
+                              child: const Text("Show All Devices", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ...nearbyDiscovered.map((dev) {
+                    final isSelectedTarget = target.id == dev.id;
+                    final isLiveConnected = state.currentDevice.id == dev.id && state.currentDevice.isConnected;
 
-                  return Container(
+                    return Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: cardBg,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isSelectedTarget ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0),
+                        color: isSelectedTarget ? const Color(0xFF0284C7) : cardBorder,
                         width: isSelectedTarget ? 1.5 : 1,
                       ),
                     ),
@@ -426,12 +566,12 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF0F9FF),
+                              color: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFF0F9FF),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Icon(
-                              _getDeviceIcon(dev.deviceType),
-                              color: const Color(0xFF0284C7),
+                            child: const Icon(
+                              Icons.devices,
+                              color: Color(0xFF0284C7),
                               size: 20,
                             ),
                           ),
@@ -450,27 +590,39 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                           Flexible(
                             child: Text(
                               dev.name,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          if (dev.isRobotDevice) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: isDark ? const Color(0xFFB45309) : const Color(0xFFFDE68A)),
+                              ),
+                              child: Text("★ ROBOT", style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))),
+                            ),
+                          ],
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFECFDF5),
+                              color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               "${dev.rssi} dBm",
-                              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Color(0xFF059669)),
+                              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Color(0xFF10B981)),
                             ),
                           ),
                         ],
                       ),
                       subtitle: Text(
                         "${dev.protocol} • ${dev.macAddress}",
-                        style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF64748B)),
+                        style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: textSecondary),
                       ),
                       trailing: ElevatedButton(
                         style: ElevatedButton.styleFrom(
@@ -551,9 +703,9 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
           // Bottom Action Bar: Connect Now or Done
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+            decoration: BoxDecoration(
+              color: cardBg,
+              border: Border(top: BorderSide(color: cardBorder)),
             ),
             child: Row(
               children: [
@@ -578,20 +730,29 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                           if (mounted) Navigator.pop(context);
                           return;
                         }
-                        final targetSsid = (target.name.contains("ESP") || target.name.contains("Robot")) ? "iBots-Robot" : target.name;
-                        final matching = state.wifiService.availableNetworks.firstWhere(
-                          (n) => n.ssid.toLowerCase() == targetSsid.toLowerCase() || n.isEspDevice,
-                          orElse: () => RealWifiNetwork(
-                            ssid: targetSsid,
-                            bssid: target.macAddress,
-                            level: target.rssi,
-                            frequency: 2412,
-                            capabilities: "[WPA2-PSK]",
-                            isSaved: true,
-                          ),
-                        );
-                        final ok = await WifiConnectDialog.show(context, matching);
-                        if (ok && mounted) Navigator.pop(context);
+                        final matchingList = state.wifiService.availableNetworks.where(
+                          (n) => n.ssid.toLowerCase() == target.name.toLowerCase() ||
+                                 (target.macAddress.isNotEmpty && n.bssid.toLowerCase() == target.macAddress.toLowerCase()),
+                        ).toList();
+
+                        if (matchingList.isNotEmpty) {
+                          final ok = await WifiConnectDialog.show(context, matchingList.first);
+                          if (ok && mounted) Navigator.pop(context);
+                          return;
+                        }
+
+                        final espCandidates = state.wifiService.availableNetworks.where((n) => n.isEspDevice).toList();
+                        if (espCandidates.isNotEmpty) {
+                          final ok = await WifiConnectDialog.show(context, espCandidates.first);
+                          if (ok && mounted) Navigator.pop(context);
+                          return;
+                        }
+
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Wi-Fi network '${target.name}' not found nearby.")),
+                          );
+                        }
                       } else {
                         Navigator.pop(context);
                         await state.connectToTargetDevice();
@@ -620,10 +781,10 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    side: BorderSide(color: cardBorder),
                   ),
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("Done", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                  child: Text("Done", style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
                 ),
               ],
             ),
@@ -633,34 +794,48 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
     );
   }
 
-  Widget _buildSectionHeader({required String title, required int count, required String badge}) {
+  Widget _buildSectionHeader({
+    required String title,
+    required int count,
+    required String badge,
+    Widget? trailing,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.bold,
             letterSpacing: 0.5,
-            color: Color(0xFF475569),
+            color: textSecondary,
           ),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE2E8F0),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            "$count • $badge",
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'monospace',
-              color: Color(0xFF334155),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (trailing != null) ...[
+              trailing,
+              const SizedBox(width: 8),
+            ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: chipBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                "$count • $badge",
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'monospace',
+                  color: textPrimary,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ],
     );
@@ -681,9 +856,9 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
   Widget _buildWifiModesCard() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.3), width: 1.5),
+        border: Border.all(color: cardBorder, width: 1.5),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF0284C7).withOpacity(0.06),
@@ -707,17 +882,17 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                 child: const Icon(Icons.wifi, color: Color(0xFF0284C7), size: 20),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       "ESP32 & ESP8266 Wi-Fi Connectivity",
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrimary),
                     ),
                     Text(
                       "Choose your connection mode below",
-                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      style: TextStyle(fontSize: 11, color: textSecondary),
                     ),
                   ],
                 ),
@@ -730,7 +905,7 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
+              color: chipBg,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -741,7 +916,7 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: _wifiTab == 0 ? Colors.white : Colors.transparent,
+                        color: _wifiTab == 0 ? cardBg : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: _wifiTab == 0
                             ? [
@@ -759,7 +934,7 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                           Icon(
                             Icons.router,
                             size: 15,
-                            color: _wifiTab == 0 ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                            color: _wifiTab == 0 ? const Color(0xFF0284C7) : textSecondary,
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -767,7 +942,7 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: _wifiTab == 0 ? FontWeight.bold : FontWeight.w600,
-                              color: _wifiTab == 0 ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                              color: _wifiTab == 0 ? const Color(0xFF0284C7) : textSecondary,
                             ),
                           ),
                         ],
@@ -781,7 +956,7 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: _wifiTab == 1 ? Colors.white : Colors.transparent,
+                        color: _wifiTab == 1 ? cardBg : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: _wifiTab == 1
                             ? [
@@ -799,7 +974,7 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                           Icon(
                             Icons.wifi_tethering,
                             size: 15,
-                            color: _wifiTab == 1 ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                            color: _wifiTab == 1 ? const Color(0xFF0284C7) : textSecondary,
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -807,7 +982,7 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: _wifiTab == 1 ? FontWeight.bold : FontWeight.w600,
-                              color: _wifiTab == 1 ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                              color: _wifiTab == 1 ? const Color(0xFF0284C7) : textSecondary,
                             ),
                           ),
                         ],
@@ -832,41 +1007,34 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Mode 1 Description Banner
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF0FDF4),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFBBF7D0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.check_circle, size: 16, color: Color(0xFF16A34A)),
-                  SizedBox(width: 6),
-                  Text(
-                    "Mode 1: Wi-Fi — Local Network",
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+        // Mode 1 Header with (i) Info Button
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.router, size: 16, color: Color(0xFF16A34A)),
+                const SizedBox(width: 6),
+                Text(
+                  "Mode 1: Wi-Fi — Local Network",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF15803D),
                   ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                "The ESP32 and phone connect to the same Wi-Fi router. The app communicates with the ESP32 using its local IP address.",
-                style: TextStyle(fontSize: 11, color: Color(0xFF334155), height: 1.3),
-              ),
-              const SizedBox(height: 8),
-              _buildFeatureBullet("Best for local control"),
-              _buildFeatureBullet("Control hardware and monitor sensors"),
-              _buildFeatureBullet("No cloud server required"),
-              _buildFeatureBullet("Internet access is not necessary once local network is set up"),
-            ],
-          ),
+                ),
+              ],
+            ),
+            IconButton(
+              icon: Icon(Icons.info_outline, size: 20, color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF15803D)),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              tooltip: "Mode 1 Info",
+              onPressed: () => showWifiModeInfoDialog(context, mode: 0),
+            ),
+          ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
 
         // IP & Port Configuration
         Row(
@@ -876,17 +1044,19 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("ESP IP Address / Host", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                  Text("ESP IP Address / Host", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textSecondary)),
                   const SizedBox(height: 4),
                   TextField(
                     controller: _ipController,
                     decoration: InputDecoration(
                       hintText: "192.168.1.100 or esp32.local",
+                      hintStyle: TextStyle(color: textSecondary.withOpacity(0.6)),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cardBorder)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cardBorder)),
                     ),
-                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                    style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: textPrimary),
                   ),
                 ],
               ),
@@ -897,25 +1067,36 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Port", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                  Text("Port", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textSecondary)),
                   const SizedBox(height: 4),
                   TextField(
                     controller: _portController,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       hintText: "80",
+                      hintStyle: TextStyle(color: textSecondary.withOpacity(0.6)),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cardBorder)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cardBorder)),
                     ),
-                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                    style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: textPrimary),
                   ),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
+        Text(
+          "💡 Enter the exact IP address from your Arduino Serial Monitor (the one you opened in Chrome). Port 80 is standard for web servers.",
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w500,
+            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+          ),
+        ),
+        const SizedBox(height: 10),
 
         // Subnet Scanner Action
         Row(
@@ -948,16 +1129,16 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
         // Discovered LAN Devices List
         if (state.wifiService.discoveredLanDevices.isNotEmpty) ...[
           const SizedBox(height: 10),
-          const Text("DISCOVERED ESP DEVICES ON LOCAL ROUTER:", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+          Text("DISCOVERED ESP DEVICES ON LOCAL ROUTER:", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textSecondary)),
           const SizedBox(height: 6),
           ...state.wifiService.discoveredLanDevices.map((d) {
             return Container(
               margin: const EdgeInsets.only(bottom: 6),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: subBg,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: cardBorder),
               ),
               child: Row(
                 children: [
@@ -967,8 +1148,8 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(d.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        Text("${d.ip}:${d.port} • Ping: ${d.pingMs}ms", style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF64748B))),
+                        Text(d.name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary)),
+                        Text("${d.ip}:${d.port} • Ping: ${d.pingMs}ms", style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: textSecondary)),
                       ],
                     ),
                   ),
@@ -1048,60 +1229,32 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Mode 2 Description Banner
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEFF6FF),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFBFDBFE)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.wifi_tethering, size: 16, color: Color(0xFF2563EB)),
-                  SizedBox(width: 6),
-                  Text(
-                    "Mode 2: ESP32 Hotspot (SoftAP)",
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
+        // Mode 2 Header with (i) Info Button
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.wifi_tethering, size: 16, color: Color(0xFF2563EB)),
+                const SizedBox(width: 6),
+                Text(
+                  "Mode 2: ESP32 Hotspot (SoftAP)",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8),
                   ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                "The ESP32 creates its own Wi-Fi network, and the phone connects directly to it.",
-                style: TextStyle(fontSize: 11, color: Color(0xFF334155), height: 1.3),
-              ),
-              const SizedBox(height: 8),
-              _buildFeatureBullet("Works without a Wi-Fi router"),
-              _buildFeatureBullet("Useful for initial device configuration"),
-              _buildFeatureBullet("Direct standalone control anywhere (outdoors/field)"),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFFDE68A)),
                 ),
-                child: const Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.warning_amber_rounded, size: 15, color: Color(0xFFD97706)),
-                    SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        "The phone may lose internet access while connected to the ESP32 hotspot.",
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+              ],
+            ),
+            IconButton(
+              icon: Icon(Icons.info_outline, size: 20, color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8)),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              tooltip: "Mode 2 Info",
+              onPressed: () => showWifiModeInfoDialog(context, mode: 1),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
 
@@ -1109,33 +1262,36 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
+            color: subBg,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: cardBorder),
           ),
-          child: const Column(
+          child: Column(
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("Default Gateway IP:", style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                  Text("192.168.4.1", style: TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  Text("Default Gateway IP:", style: TextStyle(fontSize: 11, color: textSecondary)),
+                  Text("192.168.4.1", style: TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: textPrimary)),
                 ],
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("Default SoftAP SSID:", style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                  Text("ESP32_iBots_Robot", style: TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                  Text("Current / SoftAP SSID:", style: TextStyle(fontSize: 11, color: textSecondary)),
+                  Text(
+                    state.wifiService.currentPhoneWifi?.ssid ?? "ESP Hotspot",
+                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+                  ),
                 ],
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("Default Password:", style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                  Text("12345678", style: TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  Text("Default Password:", style: TextStyle(fontSize: 11, color: textSecondary)),
+                  Text("12345678", style: TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: textPrimary)),
                 ],
               ),
             ],
@@ -1173,20 +1329,16 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
                   return;
                 }
 
-                final matching = state.wifiService.availableNetworks.firstWhere(
-                  (n) => n.isEspDevice || n.ssid.toLowerCase().contains("robot"),
-                  orElse: () => const RealWifiNetwork(
-                    ssid: "iBots-Robot",
-                    bssid: "",
-                    level: -45,
-                    frequency: 2412,
-                    capabilities: "[WPA2-PSK]",
-                    isSaved: true,
-                  ),
-                );
-                final ok = await WifiConnectDialog.show(context, matching);
-                if (ok && mounted) {
-                  Navigator.pop(context);
+                final espCandidates = state.wifiService.availableNetworks.where((n) => n.isEspDevice || n.ssid.toLowerCase().contains("robot") || n.ssid.toLowerCase().contains("esp")).toList();
+                if (espCandidates.isNotEmpty) {
+                  final ok = await WifiConnectDialog.show(context, espCandidates.first);
+                  if (ok && mounted) {
+                    Navigator.pop(context);
+                  }
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("No ESP32 Hotspot found in scan. Please connect your phone to the ESP Hotspot in Wi-Fi settings first.")),
+                  );
                 }
               }
             },
@@ -1198,21 +1350,6 @@ class _DeviceDiscoverySheetState extends State<DeviceDiscoverySheet> with Single
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildFeatureBullet(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("• ", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
-          Expanded(
-            child: Text(text, style: const TextStyle(fontSize: 10.5, color: Color(0xFF475569))),
-          ),
-        ],
-      ),
     );
   }
 }

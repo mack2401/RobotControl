@@ -27,21 +27,22 @@ class TacticalGlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: margin,
       padding: padding,
       decoration: BoxDecoration(
-        color: backgroundColor ?? AppColors.surface,
+        color: backgroundColor ?? (isDark ? const Color(0xFF1E293B) : AppColors.surface),
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
-          color: borderColor ?? AppColors.cardBorder,
+          color: borderColor ?? (isDark ? const Color(0xFF334155) : AppColors.cardBorder),
           width: 1,
         ),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0A0F172A),
+            color: isDark ? const Color(0x33000000) : const Color(0x0A0F172A),
             blurRadius: 16,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -69,15 +70,20 @@ class HudStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isSuccess = dotColor == AppColors.success || dotColor == AppColors.successLight;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isSuccess ? AppColors.successContainer : AppColors.surfaceContainerHigh,
+        color: isSuccess
+            ? (isDark ? const Color(0xFF064E3B) : AppColors.successContainer)
+            : (isDark ? const Color(0xFF1E293B) : AppColors.surfaceContainerHigh),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isSuccess ? AppColors.successBorder : AppColors.outline,
+          color: isSuccess
+              ? (isDark ? const Color(0xFF059669) : AppColors.successBorder)
+              : (isDark ? const Color(0xFF334155) : AppColors.outline),
           width: 1,
         ),
       ),
@@ -103,7 +109,7 @@ class HudStatusPill extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
-              color: textColor ?? (isSuccess ? AppColors.success : AppColors.onSurfaceVariant),
+              color: textColor ?? (isSuccess ? (isDark ? const Color(0xFF34D399) : AppColors.success) : (isDark ? const Color(0xFFCBD5E1) : AppColors.onSurfaceVariant)),
               fontFamily: 'monospace',
             ),
           ),
@@ -136,6 +142,7 @@ class _TacticalJoystickState extends State<TacticalJoystick> {
   @override
   Widget build(BuildContext context) {
     final maxRadius = (widget.size / 2) - 24;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onPanStart: (details) => _updatePosition(details.localPosition, maxRadius),
@@ -152,13 +159,13 @@ class _TacticalJoystickState extends State<TacticalJoystick> {
         height: widget.size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white,
-          border: Border.all(color: AppColors.outline, width: 2),
-          boxShadow: const [
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.outline, width: 2),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x0F0F172A),
+              color: isDark ? const Color(0x33000000) : const Color(0x0F0F172A),
               blurRadius: 10,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -169,12 +176,12 @@ class _TacticalJoystickState extends State<TacticalJoystick> {
             Container(
               width: 1,
               height: widget.size * 0.7,
-              color: AppColors.outline,
+              color: isDark ? const Color(0xFF334155) : AppColors.outline,
             ),
             Container(
               height: 1,
               width: widget.size * 0.7,
-              color: AppColors.outline,
+              color: isDark ? const Color(0xFF334155) : AppColors.outline,
             ),
             // Outer concentric ring
             Container(
@@ -182,7 +189,7 @@ class _TacticalJoystickState extends State<TacticalJoystick> {
               height: widget.size * 0.65,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.outlineVariant),
+                border: Border.all(color: isDark ? const Color(0xFF475569) : AppColors.outlineVariant),
               ),
             ),
             // Thumb knob
@@ -252,18 +259,19 @@ class ArtificialHorizonGauge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white,
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
         border: Border.all(color: AppColors.primary, width: 2),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x1A0F172A),
+            color: isDark ? const Color(0x33000000) : const Color(0x1A0F172A),
             blurRadius: 10,
-            offset: Offset(0, 3),
+            offset: const Offset(0, 3),
           ),
         ],
       ),

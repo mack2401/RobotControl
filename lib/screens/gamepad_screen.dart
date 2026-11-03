@@ -18,6 +18,15 @@ class _GamepadScreenState extends State<GamepadScreen> {
   String activeOutput = 'IDLE';
   String? toastMessage;
 
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get scaffoldBg => isDark ? const Color(0xFF0B0F17) : const Color(0xFFF8FAFC);
+  Color get appBarBg => isDark ? const Color(0xFF0F172A) : Colors.white.withOpacity(0.95);
+  Color get cardBg => isDark ? const Color(0xFF1E293B) : Colors.white;
+  Color get cardBorder => isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+  Color get textPrimary => isDark ? Colors.white : const Color(0xFF0F172A);
+  Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+  Color get chipBg => isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+
   // Joystick position
   Offset _joystickOffset = Offset.zero;
 
@@ -123,26 +132,26 @@ class _GamepadScreenState extends State<GamepadScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                color: const Color(0xFFF8FAFC),
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.code, color: Color(0xFF0D9488), size: 18),
-                        SizedBox(width: 8),
+                        const Icon(Icons.code, color: Color(0xFF0D9488), size: 18),
+                        const SizedBox(width: 8),
                         Text(
                           'Arduino / ESP32 Gamepad Protocol',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textPrimary),
                         ),
                       ],
                     ),
                     InkWell(
                       onTap: () => Navigator.pop(ctx),
                       borderRadius: BorderRadius.circular(12),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4.0),
-                        child: Icon(Icons.close, size: 18, color: Color(0xFF94A3B8)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: Icon(Icons.close, size: 18, color: textSecondary),
                       ),
                     ),
                   ],
@@ -183,7 +192,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
               ),
               Container(
                 padding: const EdgeInsets.all(12),
-                color: const Color(0xFFF8FAFC),
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -214,11 +223,11 @@ class _GamepadScreenState extends State<GamepadScreen> {
         ]);
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: scaffoldBg,
         appBar: AppBar(
           elevation: 0,
           toolbarHeight: 44,
-          backgroundColor: Colors.white.withOpacity(0.95),
+          backgroundColor: appBarBg,
           leading: Padding(
             padding: const EdgeInsets.all(6.0),
             child: InkWell(
@@ -233,20 +242,20 @@ class _GamepadScreenState extends State<GamepadScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFF1F5F9),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  color: chipBg,
+                  border: Border.all(color: cardBorder),
                 ),
-                child: const Icon(Icons.arrow_back, size: 16, color: Color(0xFF334155)),
+                child: Icon(Icons.arrow_back, size: 16, color: textPrimary),
               ),
             ),
           ),
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Flexible(
+              Flexible(
                 child: Text(
                   'Virtual Gamepad',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textPrimary),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -254,9 +263,9 @@ class _GamepadScreenState extends State<GamepadScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
+                  color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                  border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -272,7 +281,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
                     const SizedBox(width: 5),
                     Text(
                       isConnected ? 'BLE Connected' : 'Offline',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF047857)),
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? const Color(0xFF34D399) : const Color(0xFF047857)),
                     ),
                   ],
                 ),
@@ -296,10 +305,12 @@ class _GamepadScreenState extends State<GamepadScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   decoration: BoxDecoration(
-                    color: state.useNumericMotionCommands ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
+                    color: state.useNumericMotionCommands
+                        ? (isDark ? const Color(0xFF1E3A5F) : const Color(0xFFEFF6FF))
+                        : chipBg,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: state.useNumericMotionCommands ? const Color(0xFF3B82F6) : const Color(0xFFE2E8F0),
+                      color: state.useNumericMotionCommands ? const Color(0xFF3B82F6) : cardBorder,
                     ),
                   ),
                   child: Row(
@@ -307,7 +318,9 @@ class _GamepadScreenState extends State<GamepadScreen> {
                       Icon(
                         state.useNumericMotionCommands ? Icons.pin : Icons.font_download,
                         size: 13,
-                        color: state.useNumericMotionCommands ? const Color(0xFF1D4ED8) : const Color(0xFF475569),
+                        color: state.useNumericMotionCommands
+                            ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8))
+                            : textSecondary,
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -315,7 +328,9 @@ class _GamepadScreenState extends State<GamepadScreen> {
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.bold,
-                          color: state.useNumericMotionCommands ? const Color(0xFF1D4ED8) : const Color(0xFF475569),
+                          color: state.useNumericMotionCommands
+                              ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8))
+                              : textSecondary,
                           fontFamily: 'monospace',
                         ),
                       ),
@@ -338,21 +353,21 @@ class _GamepadScreenState extends State<GamepadScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
+                    color: chipBg,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: cardBorder),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.bluetooth,
                         size: 14,
-                        color: isConnected ? const Color(0xFF0D9488) : const Color(0xFF94A3B8),
+                        color: isConnected ? const Color(0xFF0D9488) : textSecondary,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         isConnected ? 'On' : 'Off',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF334155)),
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textPrimary),
                       ),
                     ],
                   ),
@@ -368,11 +383,11 @@ class _GamepadScreenState extends State<GamepadScreen> {
                 child: Container(
                   width: 32,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
+                    color: chipBg,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: cardBorder),
                   ),
-                  child: const Icon(Icons.code, size: 15, color: Color(0xFF334155)),
+                  child: Icon(Icons.code, size: 15, color: textPrimary),
                 ),
               ),
             ),
@@ -490,10 +505,12 @@ class _GamepadScreenState extends State<GamepadScreen> {
       height: 216,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const RadialGradient(
-          colors: [Color(0xFFF8FAFC), Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
+        gradient: RadialGradient(
+          colors: isDark
+              ? const [Color(0xFF1E293B), Color(0xFF0F172A), Color(0xFF0B0F17)]
+              : const [Color(0xFFF8FAFC), Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
         ),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: cardBorder),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF0F172A).withOpacity(0.06),
@@ -552,10 +569,12 @@ class _GamepadScreenState extends State<GamepadScreen> {
           height: 44,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: const RadialGradient(
-              colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1), Color(0xFF94A3B8)],
+            gradient: RadialGradient(
+              colors: isDark
+                  ? const [Color(0xFF334155), Color(0xFF1E293B), Color(0xFF0F172A)]
+                  : const [Color(0xFFE2E8F0), Color(0xFFCBD5E1), Color(0xFF94A3B8)],
             ),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
+            border: Border.all(color: cardBorder),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.1),
@@ -710,10 +729,12 @@ class _GamepadScreenState extends State<GamepadScreen> {
       height: 216,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const RadialGradient(
-          colors: [Color(0xFFF8FAFC), Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
+        gradient: RadialGradient(
+          colors: isDark
+              ? const [Color(0xFF1E293B), Color(0xFF0F172A), Color(0xFF0B0F17)]
+              : const [Color(0xFFF8FAFC), Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
         ),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: cardBorder),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF0F172A).withOpacity(0.06),
@@ -771,10 +792,12 @@ class _GamepadScreenState extends State<GamepadScreen> {
             height: 38,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const RadialGradient(
-                colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1), Color(0xFF94A3B8)],
+              gradient: RadialGradient(
+                colors: isDark
+                    ? const [Color(0xFF334155), Color(0xFF1E293B), Color(0xFF0F172A)]
+                    : const [Color(0xFFE2E8F0), Color(0xFFCBD5E1), Color(0xFF94A3B8)],
               ),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
+              border: Border.all(color: cardBorder),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.1),
@@ -811,15 +834,25 @@ class _GamepadScreenState extends State<GamepadScreen> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: isPressed
-              ? const RadialGradient(
-                  center: Alignment(0.1, 0.1),
-                  colors: [Color(0xFFF1F5F9), Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
-                )
-              : const RadialGradient(
-                  center: Alignment(-0.3, -0.3),
-                  colors: [Colors.white, Colors.white, Color(0xFFF1F5F9)],
-                ),
-          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+              ? (isDark
+                  ? const RadialGradient(
+                      center: Alignment(0.1, 0.1),
+                      colors: [Color(0xFF1E293B), Color(0xFF0F172A), Color(0xFF020617)],
+                    )
+                  : const RadialGradient(
+                      center: Alignment(0.1, 0.1),
+                      colors: [Color(0xFFF1F5F9), Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
+                    ))
+              : (isDark
+                  ? const RadialGradient(
+                      center: Alignment(-0.3, -0.3),
+                      colors: [Color(0xFF334155), Color(0xFF1E293B), Color(0xFF0F172A)],
+                    )
+                  : const RadialGradient(
+                      center: Alignment(-0.3, -0.3),
+                      colors: [Colors.white, Colors.white, Color(0xFFF1F5F9)],
+                    )),
+          border: Border.all(color: cardBorder, width: 1.5),
           boxShadow: isPressed
               ? [
                   BoxShadow(
@@ -845,7 +878,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
           child: Icon(
             icon,
             size: 28,
-            color: isPressed ? const Color(0xFF0D9488) : const Color(0xFF1E293B),
+            color: isPressed ? const Color(0xFF0D9488) : textPrimary,
           ),
         ),
       ),
@@ -870,15 +903,25 @@ class _GamepadScreenState extends State<GamepadScreen> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: isPressed
-              ? const RadialGradient(
-                  center: Alignment(0.1, 0.1),
-                  colors: [Color(0xFFF1F5F9), Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
-                )
-              : const RadialGradient(
-                  center: Alignment(-0.3, -0.3),
-                  colors: [Colors.white, Colors.white, Color(0xFFF1F5F9)],
-                ),
-          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+              ? (isDark
+                  ? const RadialGradient(
+                      center: Alignment(0.1, 0.1),
+                      colors: [Color(0xFF1E293B), Color(0xFF0F172A), Color(0xFF020617)],
+                    )
+                  : const RadialGradient(
+                      center: Alignment(0.1, 0.1),
+                      colors: [Color(0xFFF1F5F9), Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
+                    ))
+              : (isDark
+                  ? const RadialGradient(
+                      center: Alignment(-0.3, -0.3),
+                      colors: [Color(0xFF334155), Color(0xFF1E293B), Color(0xFF0F172A)],
+                    )
+                  : const RadialGradient(
+                      center: Alignment(-0.3, -0.3),
+                      colors: [Colors.white, Colors.white, Color(0xFFF1F5F9)],
+                    )),
+          border: Border.all(color: cardBorder, width: 1.5),
           boxShadow: isPressed
               ? [
                   BoxShadow(
@@ -906,7 +949,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
-              color: isPressed ? color : const Color(0xFF1E293B),
+              color: isPressed ? color : (isDark ? Colors.white : const Color(0xFF1E293B)),
             ),
           ),
         ),
@@ -952,9 +995,9 @@ class _GamepadScreenState extends State<GamepadScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardBg,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: const Color(0xFFCBD5E1)),
+          border: Border.all(color: cardBorder),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -974,10 +1017,10 @@ class _GamepadScreenState extends State<GamepadScreen> {
             const SizedBox(width: 6),
             Text(
               currentMode == 'arrows' ? 'Directional Arrows' : 'Movable Joystick',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textPrimary),
             ),
             const SizedBox(width: 6),
-            const Icon(Icons.keyboard_arrow_down, size: 14, color: Color(0xFF64748B)),
+            Icon(Icons.keyboard_arrow_down, size: 14, color: textSecondary),
           ],
         ),
       ),
@@ -988,9 +1031,9 @@ class _GamepadScreenState extends State<GamepadScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: cardBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -1025,7 +1068,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
             margin: const EdgeInsets.symmetric(vertical: 6),
             width: 36,
             height: 1,
-            color: const Color(0xFFE2E8F0),
+            color: cardBorder,
           ),
           const Text(
             'OUTPUT',
@@ -1039,11 +1082,11 @@ class _GamepadScreenState extends State<GamepadScreen> {
           const SizedBox(height: 2),
           Text(
             activeOutput,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'monospace',
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
+              color: textPrimary,
             ),
           ),
           const SizedBox(height: 10),
@@ -1103,18 +1146,18 @@ class _GamepadScreenState extends State<GamepadScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
-                color: const Color(0xFFF1F5F9),
-                border: Border.all(color: const Color(0xFFCBD5E1)),
+                color: chipBg,
+                border: Border.all(color: cardBorder),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.pause, size: 12, color: Color(0xFF475569)),
-                  SizedBox(width: 4),
+                  Icon(Icons.pause, size: 12, color: textSecondary),
+                  const SizedBox(width: 4),
                   Text(
                     'PAUSE',
                     style: TextStyle(
-                      color: Color(0xFF475569),
+                      color: textSecondary,
                       fontWeight: FontWeight.w900,
                       fontSize: 10,
                       letterSpacing: 1,

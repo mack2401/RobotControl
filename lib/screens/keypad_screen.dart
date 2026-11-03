@@ -19,6 +19,16 @@ class _KeypadScreenState extends State<KeypadScreen> {
   String? lastTransmitted;
   bool instantSend = true;
 
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get scaffoldBg => isDark ? const Color(0xFF0B0F17) : const Color(0xFFF8FAFC);
+  Color get appBarBg => isDark ? const Color(0xFF0F172A) : Colors.white;
+  Color get cardBg => isDark ? const Color(0xFF1E293B) : Colors.white;
+  Color get cardBorder => isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+  Color get textPrimary => isDark ? Colors.white : const Color(0xFF1E293B);
+  Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+  Color get subBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+  Color get chipBg => isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+
   void _showToast(String msg, {IconData icon = Icons.info}) {
     setState(() {
       toastMessage = msg;
@@ -119,10 +129,10 @@ class _KeypadScreenState extends State<KeypadScreen> {
             : '—— —— ——';
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF8FAFC),
+          backgroundColor: scaffoldBg,
           appBar: AppBar(
             elevation: 0,
-            backgroundColor: Colors.white.withOpacity(0.95),
+            backgroundColor: appBarBg.withOpacity(0.95),
             leading: Padding(
               padding: const EdgeInsets.all(8.0),
               child: InkWell(
@@ -131,23 +141,23 @@ class _KeypadScreenState extends State<KeypadScreen> {
                 child: Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFFF1F5F9),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    color: cardBg,
+                    border: Border.all(color: cardBorder),
                   ),
-                  child: const Icon(Icons.arrow_back, size: 18, color: Color(0xFF1E293B)),
+                  child: Icon(Icons.arrow_back, size: 18, color: textPrimary),
                 ),
               ),
             ),
-            title: const Column(
+            title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Virtual Keypad',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
                 ),
                 Text(
                   'SERIAL COMMAND GATEWAY',
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.8, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.8, color: textSecondary),
                 ),
               ],
             ),
@@ -164,10 +174,14 @@ class _KeypadScreenState extends State<KeypadScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: isConnected ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
+                          color: isConnected
+                              ? (isDark ? const Color(0xFF064E3B).withOpacity(0.3) : const Color(0xFFF0FDF4))
+                              : (isDark ? const Color(0xFF78350F).withOpacity(0.3) : const Color(0xFFFFFBEB)),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isConnected ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A),
+                            color: isConnected
+                                ? (isDark ? const Color(0xFF059669) : const Color(0xFFBBF7D0))
+                                : (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A)),
                           ),
                         ),
                         child: Row(
@@ -179,7 +193,9 @@ class _KeypadScreenState extends State<KeypadScreen> {
                                   Icon(
                                     isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
                                     size: 16,
-                                    color: isConnected ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                                    color: isConnected
+                                        ? (isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A))
+                                        : (isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706)),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
@@ -190,7 +206,9 @@ class _KeypadScreenState extends State<KeypadScreen> {
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
-                                        color: isConnected ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                                        color: isConnected
+                                            ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF15803D))
+                                            : (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309)),
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -213,10 +231,14 @@ class _KeypadScreenState extends State<KeypadScreen> {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: instantSend ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9),
+                                  color: instantSend
+                                      ? (isDark ? const Color(0xFF1E3A8A) : const Color(0xFFE0F2FE))
+                                      : chipBg,
                                   borderRadius: BorderRadius.circular(999),
                                   border: Border.all(
-                                    color: instantSend ? const Color(0xFFBAE6FD) : const Color(0xFFCBD5E1),
+                                    color: instantSend
+                                        ? (isDark ? const Color(0xFF38BDF8) : const Color(0xFFBAE6FD))
+                                        : cardBorder,
                                   ),
                                 ),
                                 child: Row(
@@ -225,7 +247,7 @@ class _KeypadScreenState extends State<KeypadScreen> {
                                     Icon(
                                       instantSend ? Icons.flash_on : Icons.all_inbox,
                                       size: 12,
-                                      color: instantSend ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                                      color: instantSend ? const Color(0xFF38BDF8) : textSecondary,
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
@@ -233,7 +255,7 @@ class _KeypadScreenState extends State<KeypadScreen> {
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
-                                        color: instantSend ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                                        color: instantSend ? const Color(0xFF38BDF8) : textSecondary,
                                       ),
                                     ),
                                   ],
@@ -248,9 +270,9 @@ class _KeypadScreenState extends State<KeypadScreen> {
                       Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: cardBg,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          border: Border.all(color: cardBorder),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.03),
@@ -268,17 +290,17 @@ class _KeypadScreenState extends State<KeypadScreen> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Row(
+                                  Row(
                                     children: [
-                                      Icon(Icons.data_array, size: 16, color: Color(0xFF0284C7)),
-                                      SizedBox(width: 6),
+                                      const Icon(Icons.data_array, size: 16, color: Color(0xFF0284C7)),
+                                      const SizedBox(width: 6),
                                       Text(
                                         'PAYLOAD BUFFER',
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
                                           letterSpacing: 0.8,
-                                          color: Color(0xFF64748B),
+                                          color: textSecondary,
                                         ),
                                       ),
                                     ],
@@ -290,33 +312,33 @@ class _KeypadScreenState extends State<KeypadScreen> {
                                           margin: const EdgeInsets.only(right: 6),
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFFDCFCE7),
+                                            color: isDark ? const Color(0xFF064E3B) : const Color(0xFFDCFCE7),
                                             borderRadius: BorderRadius.circular(999),
-                                            border: Border.all(color: const Color(0xFF86EFAC)),
+                                            border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFF86EFAC)),
                                           ),
                                           child: Text(
                                             'TX: $lastTransmitted',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontFamily: 'monospace',
                                               fontSize: 9,
                                               fontWeight: FontWeight.bold,
-                                              color: Color(0xFF15803D),
+                                              color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF15803D),
                                             ),
                                           ),
                                         ),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFF1F5F9),
+                                          color: chipBg,
                                           borderRadius: BorderRadius.circular(999),
                                         ),
                                         child: Text(
                                           '${currentBuffer.length} / $maxBufferLength B',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontFamily: 'monospace',
                                             fontSize: 10,
                                             fontWeight: FontWeight.w600,
-                                            color: Color(0xFF475569),
+                                            color: textSecondary,
                                           ),
                                         ),
                                       ),
@@ -338,7 +360,7 @@ class _KeypadScreenState extends State<KeypadScreen> {
                                     fontSize: hasDigits ? 28 : 22,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: hasDigits ? 2 : 3,
-                                    color: hasDigits ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                                    color: hasDigits ? textPrimary : textSecondary,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -347,16 +369,16 @@ class _KeypadScreenState extends State<KeypadScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFE0F2FE),
+                                    color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFE0F2FE),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     'TX READY',
                                     style: TextStyle(
                                       fontFamily: 'monospace',
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0284C7),
+                                      color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
                                     ),
                                   ),
                                 ),
@@ -366,12 +388,13 @@ class _KeypadScreenState extends State<KeypadScreen> {
                         // Display Micro-Actions Row
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.only(
+                          decoration: BoxDecoration(
+                            color: subBg,
+                            borderRadius: const BorderRadius.only(
                               bottomLeft: Radius.circular(16),
                               bottomRight: Radius.circular(16),
                             ),
+                            border: Border(top: BorderSide(color: cardBorder)),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
@@ -384,17 +407,17 @@ class _KeypadScreenState extends State<KeypadScreen> {
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Colors.white,
+                                        color: cardBg,
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                                        border: Border.all(color: cardBorder),
                                       ),
-                                      child: const Row(
+                                      child: Row(
                                         children: [
-                                          Icon(Icons.clear_all, size: 13, color: Color(0xFF64748B)),
-                                          SizedBox(width: 4),
+                                          Icon(Icons.clear_all, size: 13, color: textSecondary),
+                                          const SizedBox(width: 4),
                                           Text(
                                             'CLR',
-                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textSecondary),
                                           ),
                                         ],
                                       ),
@@ -408,11 +431,11 @@ class _KeypadScreenState extends State<KeypadScreen> {
                                       width: 28,
                                       height: 24,
                                       decoration: BoxDecoration(
-                                        color: Colors.white,
+                                        color: cardBg,
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                                        border: Border.all(color: cardBorder),
                                       ),
-                                      child: const Icon(Icons.backspace, size: 14, color: Color(0xFF475569)),
+                                      child: Icon(Icons.backspace, size: 14, color: textSecondary),
                                     ),
                                   ),
                                 ],
@@ -543,9 +566,9 @@ class _KeypadScreenState extends State<KeypadScreen> {
     final bool isActionCol = key == 'A' || key == 'B' || key == 'C' || key == 'D';
     final bool isSpecial = key == '*' || key == '#';
 
-    Color mainColor = const Color(0xFF1E293B);
-    if (isActionCol) mainColor = const Color(0xFF0284C7);
-    if (isSpecial) mainColor = const Color(0xFF854D0E);
+    Color mainColor = textPrimary;
+    if (isActionCol) mainColor = isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7);
+    if (isSpecial) mainColor = isDark ? const Color(0xFFFBBF24) : const Color(0xFF854D0E);
 
     return InkWell(
       onTap: () => _appendKey(key),
@@ -553,9 +576,9 @@ class _KeypadScreenState extends State<KeypadScreen> {
       child: Container(
         height: 64,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardBg,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: cardBorder),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.03),
@@ -578,10 +601,10 @@ class _KeypadScreenState extends State<KeypadScreen> {
             ),
             Text(
               sub,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 8,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF94A3B8),
+                color: textSecondary,
                 letterSpacing: 0.5,
               ),
             ),

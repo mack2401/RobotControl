@@ -81,11 +81,11 @@ void handleCmd() {
     String cmd = server.arg("val");
     Serial.println("[CMD] " + cmd);
 
-    if (cmd == "F" || cmd == "FORWARD")       { drive(HIGH, LOW, HIGH, LOW); }
-    else if (cmd == "B" || cmd == "BACKWARD") { drive(LOW, HIGH, LOW, HIGH); }
-    else if (cmd == "L" || cmd == "LEFT")     { drive(LOW, HIGH, HIGH, LOW); }
-    else if (cmd == "R" || cmd == "RIGHT")    { drive(HIGH, LOW, LOW, HIGH); }
-    else if (cmd == "S" || cmd == "STOP")     { drive(LOW, LOW, LOW, LOW); }
+    if (cmd == "F" || cmd == "FORWARD" || cmd == "1")       { drive(HIGH, LOW, HIGH, LOW); }
+    else if (cmd == "B" || cmd == "BACKWARD" || cmd == "2") { drive(LOW, HIGH, LOW, HIGH); }
+    else if (cmd == "L" || cmd == "LEFT" || cmd == "3")     { drive(LOW, HIGH, HIGH, LOW); }
+    else if (cmd == "R" || cmd == "RIGHT" || cmd == "4")    { drive(HIGH, LOW, LOW, HIGH); }
+    else if (cmd == "S" || cmd == "STOP" || cmd == "0")     { drive(LOW, LOW, LOW, LOW); }
     else if (cmd == "H1") { digitalWrite(HORN_PIN, HIGH); }
     else if (cmd == "H0") { digitalWrite(HORN_PIN, LOW); }
     else if (cmd == "L1") { digitalWrite(LED_PIN, HIGH); }
@@ -182,11 +182,11 @@ void handleCmd() {
     String cmd = server.arg("val");
     Serial.println("[AP CMD] " + cmd);
 
-    if (cmd == "F" || cmd == "FORWARD")       { drive(HIGH, LOW, HIGH, LOW); }
-    else if (cmd == "B" || cmd == "BACKWARD") { drive(LOW, HIGH, LOW, HIGH); }
-    else if (cmd == "L" || cmd == "LEFT")     { drive(LOW, HIGH, HIGH, LOW); }
-    else if (cmd == "R" || cmd == "RIGHT")    { drive(HIGH, LOW, LOW, HIGH); }
-    else if (cmd == "S" || cmd == "STOP")     { drive(LOW, LOW, LOW, LOW); }
+    if (cmd == "F" || cmd == "FORWARD" || cmd == "1")       { drive(HIGH, LOW, HIGH, LOW); }
+    else if (cmd == "B" || cmd == "BACKWARD" || cmd == "2") { drive(LOW, HIGH, LOW, HIGH); }
+    else if (cmd == "L" || cmd == "LEFT" || cmd == "3")     { drive(LOW, HIGH, HIGH, LOW); }
+    else if (cmd == "R" || cmd == "RIGHT" || cmd == "4")    { drive(HIGH, LOW, LOW, HIGH); }
+    else if (cmd == "S" || cmd == "STOP" || cmd == "0")     { drive(LOW, LOW, LOW, LOW); }
     else if (cmd == "H1") { digitalWrite(HORN_PIN, HIGH); }
     else if (cmd == "H0") { digitalWrite(HORN_PIN, LOW); }
     else if (cmd == "L1") { digitalWrite(LED_PIN, HIGH); }
@@ -242,6 +242,157 @@ void loop() {
   delay(2);
 }''',
       note: "Mode 2: Works anywhere without a router. Phone connects directly to ESP32_iBots_Robot (pass: 12345678).",
+    ),
+
+    // 103. ESP32-S3 LiteWing Quadcopter UDP Flight Controller
+    FirmwareSnippet(
+      id: 103,
+      title: "🛸 LiteWing ESP32-S3 Quadcopter UDP Flight Controller",
+      badge: "Drone Core",
+      category: "comm",
+      description: "Circuit Digest LiteWing & ESP-Drone flight firmware. Receives 30Hz CRTP UDP commander packets on port 2390 with watchdog motor safety cutoff.",
+      icon: Icons.flight,
+      code: '''#include <WiFi.h>
+#include <WiFiUdp.h>
+
+// --- LiteWing Wi-Fi SoftAP Configuration ---
+const char* ap_ssid = "LiteWing_AP";
+const char* ap_pass = "12345678";
+const IPAddress local_IP(192, 168, 43, 42); // Default LiteWing IP
+const IPAddress gateway(192, 168, 43, 1);
+const IPAddress subnet(255, 255, 255, 0);
+
+WiFiUDP udp;
+const unsigned int localUdpPort = 2390; // Default CRTP UDP Port
+
+// --- Motor PWM Pins (LiteWing Coreless / ESC Driver) ---
+const int MOTOR_FL = 4;  // Front-Left (CW)
+const int MOTOR_FR = 5;  // Front-Right (CCW)
+const int MOTOR_RL = 6;  // Rear-Left (CCW)
+const int MOTOR_RR = 7;  // Rear-Right (CW)
+
+// PWM Properties (500Hz - 32kHz depending on FET driver)
+const int pwmFreq = 16000;
+const int pwmResolution = 10; // 0 - 1023
+
+// Flight Watchdog Timer (Cut motors if signal lost > 500ms)
+unsigned long lastPacketTime = 0;
+const unsigned long WATCHDOG_TIMEOUT_MS = 500;
+bool isArmed = false;
+
+// Packet buffer
+uint8_t packetBuffer[128];
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("\\n--- LiteWing ESP32-S3 Quadcopter Starting ---");
+
+  // Configure Motor PWM Channels
+  ledcAttach(MOTOR_FL, pwmFreq, pwmResolution);
+  ledcAttach(MOTOR_FR, pwmFreq, pwmResolution);
+  ledcAttach(MOTOR_RL, pwmFreq, pwmResolution);
+  ledcAttach(MOTOR_RR, pwmFreq, pwmResolution);
+  cutAllMotors();
+
+  // Start Access Point
+  WiFi.mode(WIFI_AP);
+  WiFi.softAPConfig(local_IP, gateway, subnet);
+  WiFi.softAP(ap_ssid, ap_pass);
+
+  Serial.print("LiteWing AP Online! SSID: ");
+  Serial.println(ap_ssid);
+  Serial.print("Drone IP: ");
+  Serial.println(WiFi.softAPIP());
+
+  udp.begin(localUdpPort);
+  Serial.printf("UDP Commander listening on port %d\\n", localUdpPort);
+}
+
+void cutAllMotors() {
+  ledcWrite(MOTOR_FL, 0);
+  ledcWrite(MOTOR_FR, 0);
+  ledcWrite(MOTOR_RL, 0);
+  ledcWrite(MOTOR_RR, 0);
+}
+
+void parseCrtpCommander(uint8_t* buf, int len) {
+  // CRTP Commander Packet: [0x30, roll(f32), pitch(f32), yaw(f32), thrust(u16)]
+  if (len < 15) return;
+  if (buf[0] != 0x30) return; // Port 3, Channel 0
+
+  float roll, pitch, yawRate;
+  uint16_t thrust;
+
+  memcpy(&roll, &buf[1], 4);
+  memcpy(&pitch, &buf[5], 4);
+  memcpy(&yawRate, &buf[9], 4);
+  memcpy(&thrust, &buf[13], 2);
+
+  // If thrust > 0, consider armed
+  if (thrust > 1000) {
+    isArmed = true;
+  } else {
+    isArmed = false;
+  }
+
+  // Basic motor mixing algorithm
+  // Map 0-65535 thrust to 0-1023 PWM
+  int basePwm = map(thrust, 0, 65535, 0, 1023);
+  int rAdj = (int)(roll * 5.0f);
+  int pAdj = (int)(pitch * 5.0f);
+  int yAdj = (int)(yawRate * 3.0f);
+
+  if (isArmed && basePwm > 50) {
+    int mFL = constrain(basePwm - pAdj + rAdj + yAdj, 0, 1023);
+    int mFR = constrain(basePwm - pAdj - rAdj - yAdj, 0, 1023);
+    int mRL = constrain(basePwm + pAdj + rAdj - yAdj, 0, 1023);
+    int mRR = constrain(basePwm + pAdj - rAdj + yAdj, 0, 1023);
+
+    ledcWrite(MOTOR_FL, mFL);
+    ledcWrite(MOTOR_FR, mFR);
+    ledcWrite(MOTOR_RL, mRL);
+    ledcWrite(MOTOR_RR, mRR);
+  } else {
+    cutAllMotors();
+  }
+}
+
+void parseAsciiCommand(char* str) {
+  if (strncmp(str, "CMD:ARM", 7) == 0) {
+    isArmed = true;
+  } else if (strncmp(str, "CMD:DISARM", 10) == 0 || strncmp(str, "CMD:EMERGENCY", 13) == 0) {
+    isArmed = false;
+    cutAllMotors();
+  }
+}
+
+void loop() {
+  int packetSize = udp.parsePacket();
+  if (packetSize > 0) {
+    lastPacketTime = millis();
+    int len = udp.read(packetBuffer, sizeof(packetBuffer) - 1);
+    if (len > 0) {
+      if (packetBuffer[0] == 0x30) {
+        parseCrtpCommander(packetBuffer, len);
+      } else {
+        packetBuffer[len] = '\\0';
+        parseAsciiCommand((char*)packetBuffer);
+      }
+    }
+  }
+
+  // SAFETY WATCHDOG: If no packets received in 500ms, kill motors!
+  if (millis() - lastPacketTime > WATCHDOG_TIMEOUT_MS) {
+    if (isArmed) {
+      cutAllMotors();
+      isArmed = false;
+    }
+  }
+
+  delay(2);
+}''',
+      note: "LiteWing Drone: Dual Mode 2 stick flight. Sends Bitcraze CRTP packets over UDP port 2390 directly to the ESP32-S3 access point.",
     ),
 
     // 0. Full Master Sketch (HC-05 + Arduino)
@@ -870,18 +1021,27 @@ void loop() {
       return inTitle || inBadge || inDesc || inCode;
     }).toList();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0B0F17) : const Color(0xFFF8FAFC),
       appBar: PreferredSize(
         preferredSize: Size.fromHeight(_isSearchVisible ? 120 : 64),
         child: Container(
-          decoration: const BoxDecoration(
-            color: Color(0xF2FFFFFF),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xF20F172A) : const Color(0xF2FFFFFF),
             border: Border(
-              bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+              bottom: BorderSide(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                width: 1,
+              ),
             ),
             boxShadow: [
-              BoxShadow(color: Color(0x0A0F172A), blurRadius: 4, offset: Offset(0, 1)),
+              BoxShadow(
+                color: isDark ? const Color(0x33000000) : const Color(0x0A0F172A),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
             ],
           ),
           child: SafeArea(
@@ -902,7 +1062,11 @@ void loop() {
                             children: [
                               IconButton(
                                 tooltip: "Go back",
-                                icon: const Icon(Icons.arrow_back, size: 22, color: Color(0xFF475569)),
+                                icon: Icon(
+                                  Icons.arrow_back,
+                                  size: 22,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                                ),
                                 onPressed: () {
                                   if (Navigator.canPop(context)) {
                                     Navigator.pop(context);
@@ -929,29 +1093,31 @@ void loop() {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEFF6FF),
+                                  color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
                                   borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                                  border: Border.all(
+                                    color: isDark ? const Color(0xFF2563EB) : const Color(0xFFBFDBFE),
+                                  ),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   "IBOTS",
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
-                                    color: Color(0xFF1D4ED8),
+                                    color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8),
                                     fontFamily: 'monospace',
                                     letterSpacing: 0.5,
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Flexible(
+                              Flexible(
                                 child: Text(
                                   "Code Examples",
                                   style: TextStyle(
                                     fontSize: 17,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0F172A),
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                                     letterSpacing: -0.3,
                                   ),
                                   overflow: TextOverflow.ellipsis,
@@ -968,7 +1134,9 @@ void loop() {
                               icon: Icon(
                                 _isSearchVisible ? Icons.close : Icons.search,
                                 size: 20,
-                                color: _isSearchVisible ? const Color(0xFF2563EB) : const Color(0xFF475569),
+                                color: _isSearchVisible
+                                    ? const Color(0xFF2563EB)
+                                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
                               ),
                               onPressed: () {
                                 setState(() {
@@ -982,7 +1150,11 @@ void loop() {
                             ),
                             IconButton(
                               tooltip: "Copy all visible sketches",
-                              icon: const Icon(Icons.copy_rounded, size: 19, color: Color(0xFF475569)),
+                              icon: Icon(
+                                Icons.copy_rounded,
+                                size: 19,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                              ),
                               onPressed: () => _copyAllVisibleCode(filtered),
                             ),
                             const SizedBox(width: 4),
@@ -1019,7 +1191,7 @@ void loop() {
                     child: TextField(
                       controller: _searchController,
                       autofocus: true,
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                      style: TextStyle(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                       decoration: InputDecoration(
                         hintText: "Search firmware, sensors, commands...",
                         hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
@@ -1034,7 +1206,7 @@ void loop() {
                               )
                             : null,
                         filled: true,
-                        fillColor: const Color(0xFFF1F5F9),
+                        fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -1054,11 +1226,11 @@ void loop() {
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 96),
         children: [
           // Top Utility Banner
-          _buildTopUtilityBanner(),
+          _buildTopUtilityBanner(isDark),
           const SizedBox(height: 14),
 
           // Cards Stack
-          ...filtered.map((snippet) => _buildCodeCard(snippet)),
+          ...filtered.map((snippet) => _buildCodeCard(snippet, isDark)),
 
           if (filtered.isEmpty)
             Padding(
@@ -1086,15 +1258,19 @@ void loop() {
     );
   }
 
-  Widget _buildTopUtilityBanner() {
+  Widget _buildTopUtilityBanner(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x060F172A), blurRadius: 6, offset: Offset(0, 2)),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? const Color(0x33000000) : const Color(0x060F172A),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -1104,15 +1280,15 @@ void loop() {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                children: const [
-                  Icon(Icons.terminal, color: Color(0xFF2563EB), size: 20),
-                  SizedBox(width: 8),
+                children: [
+                  const Icon(Icons.terminal, color: Color(0xFF2563EB), size: 20),
+                  const SizedBox(width: 8),
                   Text(
                     "Firmware Snippets",
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
                   ),
                 ],
@@ -1120,16 +1296,16 @@ void loop() {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
                   borderRadius: BorderRadius.circular(9999),
-                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                  border: Border.all(color: isDark ? const Color(0xFF2563EB) : const Color(0xFFBFDBFE)),
                 ),
-                child: const Text(
+                child: Text(
                   "SAMPLE CODE v2.4",
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF1D4ED8),
+                    color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8),
                     fontFamily: 'monospace',
                     letterSpacing: 0.5,
                   ),
@@ -1138,11 +1314,11 @@ void loop() {
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             "Optimized C++/Arduino sketches for low-latency robotics. Fully compatible with BLE, Classic BT & Serial UART over HC-05/06 or ESP32 native hardware interfaces.",
             style: TextStyle(
               fontSize: 12,
-              color: Color(0xFF475569),
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
               height: 1.4,
             ),
           ),
@@ -1152,15 +1328,15 @@ void loop() {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildCategoryChip("all", "All (14)"),
+                _buildCategoryChip("all", "All (14)", isDark),
                 const SizedBox(width: 6),
-                _buildCategoryChip("motion", "Motion & Motors"),
+                _buildCategoryChip("motion", "Motion & Motors", isDark),
                 const SizedBox(width: 6),
-                _buildCategoryChip("lighting", "Lighting & GPIO"),
+                _buildCategoryChip("lighting", "Lighting & GPIO", isDark),
                 const SizedBox(width: 6),
-                _buildCategoryChip("comm", "Communication"),
+                _buildCategoryChip("comm", "Communication", isDark),
                 const SizedBox(width: 6),
-                _buildCategoryChip("sensors", "Sensors & CAM"),
+                _buildCategoryChip("sensors", "Sensors & CAM", isDark),
               ],
             ),
           ),
@@ -1169,7 +1345,7 @@ void loop() {
     );
   }
 
-  Widget _buildCategoryChip(String filterKey, String label) {
+  Widget _buildCategoryChip(String filterKey, String label, bool isDark) {
     final isSelected = _selectedCategory == filterKey;
 
     return InkWell(
@@ -1183,10 +1359,14 @@ void loop() {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFF1F5F9),
+          color: isSelected
+              ? const Color(0xFF2563EB)
+              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
           borderRadius: BorderRadius.circular(9999),
           border: Border.all(
-            color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+            color: isSelected
+                ? const Color(0xFF2563EB)
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           ),
           boxShadow: isSelected
               ? const [BoxShadow(color: Color(0x262563EB), blurRadius: 4, offset: Offset(0, 1))]
@@ -1197,7 +1377,7 @@ void loop() {
           style: TextStyle(
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? Colors.white : const Color(0xFF334155),
+            color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF334155)),
             fontFamily: 'monospace',
           ),
         ),
@@ -1205,18 +1385,22 @@ void loop() {
     );
   }
 
-  Widget _buildCodeCard(FirmwareSnippet snippet) {
+  Widget _buildCodeCard(FirmwareSnippet snippet, bool isDark) {
     final isExpanded = _expandedCards.contains(snippet.id);
     final isCopied = _copiedStates[snippet.id] == true;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x060F172A), blurRadius: 4, offset: Offset(0, 2)),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? const Color(0x33000000) : const Color(0x060F172A),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
@@ -1236,11 +1420,11 @@ void loop() {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
+                      color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFDBEAFE)),
+                      border: Border.all(color: isDark ? const Color(0xFF2563EB) : const Color(0xFFDBEAFE)),
                     ),
-                    child: Icon(snippet.icon, size: 20, color: const Color(0xFF2563EB)),
+                    child: Icon(snippet.icon, size: 20, color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB)),
                   ),
                   const SizedBox(width: 10),
                   // Title + Badge + Subtitle
@@ -1253,10 +1437,10 @@ void loop() {
                             Flexible(
                               child: Text(
                                 snippet.title,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0F172A),
+                                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -1265,16 +1449,16 @@ void loop() {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFEFF6FF),
+                                color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
                                 borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: const Color(0xFFBFDBFE)),
+                                border: Border.all(color: isDark ? const Color(0xFF2563EB) : const Color(0xFFBFDBFE)),
                               ),
                               child: Text(
                                 snippet.badge,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1D4ED8),
+                                  color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8),
                                   fontFamily: 'monospace',
                                 ),
                               ),
@@ -1284,9 +1468,9 @@ void loop() {
                         const SizedBox(height: 2),
                         Text(
                           snippet.description,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF64748B),
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

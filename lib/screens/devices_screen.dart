@@ -3,7 +3,9 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../core/state/robot_state.dart';
 import '../core/models/device_model.dart';
 import '../core/wifi/wifi_service.dart';
+import '../core/database/device_database.dart';
 import '../widgets/wifi_connect_dialog.dart';
+import '../widgets/wifi_mode_info_dialog.dart';
 
 class DevicesScreen extends StatefulWidget {
   const DevicesScreen({super.key});
@@ -19,11 +21,22 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
   int _wifiMode = 0; // 0 = Mode 1: Local Network (Router), 1 = Mode 2: ESP Hotspot (SoftAP)
   final TextEditingController _lanIpController = TextEditingController(text: "192.168.1.100");
   final TextEditingController _lanPortController = TextEditingController(text: "80");
+  bool _filterOnlyEspWifi = true; // Toggle: show only ESP robot Wi-Fi vs all Wi-Fi
+  bool _filterOnlyRobotBt = true; // Toggle: show only Robot Bluetooth modules vs all Bluetooth devices
+
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get cardBg => isDark ? const Color(0xFF1E293B) : Colors.white;
+  Color get cardBorder => isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+  Color get textPrimary => isDark ? Colors.white : const Color(0xFF0F172A);
+  Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+  Color get subBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+  Color get chipBg => isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
 
   @override
   void initState() {
     super.initState();
     state.addListener(_onStateChanged);
+    state.wifiService.addListener(_onStateChanged);
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -37,9 +50,19 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
         await state.wifiService.requestPermissions();
       }
       state.wifiService.checkWifiEnabled();
-      state.wifiService.refreshConnectedWifi();
+      await state.wifiService.refreshConnectedWifi();
       state.wifiService.loadSavedNetworks();
       state.wifiService.scanRealWifiNetworks();
+
+      // Auto-populate local subnet prefix from phone's connected Wi-Fi (e.g. 192.168.29.)
+      final phoneWifi = state.wifiService.currentPhoneWifi;
+      if (phoneWifi != null && phoneWifi.ip.contains('.')) {
+        final parts = phoneWifi.ip.split('.');
+        if (parts.length == 4 && (_lanIpController.text == "192.168.1.100" || _lanIpController.text.isEmpty)) {
+          _lanIpController.text = "${parts[0]}.${parts[1]}.${parts[2]}.";
+          if (mounted) setState(() {});
+        }
+      }
     });
   }
 
@@ -49,6 +72,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
     _lanIpController.dispose();
     _lanPortController.dispose();
     state.removeListener(_onStateChanged);
+    state.wifiService.removeListener(_onStateChanged);
     super.dispose();
   }
 
@@ -178,11 +202,12 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     final isWifi = _selectedTransportTab == 0;
     final isScanning = isWifi ? state.wifiService.isScanningNetworks : state.isScanning;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0B0F17) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Column(
@@ -190,11 +215,18 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           children: [
             Text(
               isWifi ? "Wi-Fi Networks & Devices" : "Bluetooth Devices",
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
             ),
             Text(
               isWifi ? "Phone Wi-Fi Scanner, Saved Profiles & ESP" : "Real Mobile Bluetooth Scanner & Linker",
-              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              ),
             ),
           ],
         ),
@@ -202,7 +234,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           if (isWifi)
             IconButton(
               tooltip: "Open Phone Wi-Fi Panel",
-              icon: const Icon(Icons.tune, color: Color(0xFF475569)),
+              icon: Icon(Icons.tune, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
               onPressed: () => state.wifiService.openWifiSettings(),
             ),
           IconButton(
@@ -225,7 +257,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
         child: Column(
           children: [
             // Mode Switcher: Wi-Fi vs Bluetooth
-            _buildTransportSelector(),
+            _buildTransportSelector(isDark),
 
             // Transport Content
             Expanded(
@@ -237,12 +269,12 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildTransportSelector() {
+  Widget _buildTransportSelector(bool isDark) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE2E8F0),
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -263,10 +295,12 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 9),
                 decoration: BoxDecoration(
-                  color: _selectedTransportTab == 0 ? Colors.white : Colors.transparent,
+                  color: _selectedTransportTab == 0
+                      ? (isDark ? const Color(0xFF0F172A) : Colors.white)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: _selectedTransportTab == 0
-                      ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
+                      ? [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.06), blurRadius: 4, offset: const Offset(0, 2))]
                       : null,
                 ),
                 child: Row(
@@ -275,7 +309,9 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                     Icon(
                       Icons.wifi,
                       size: 16,
-                      color: _selectedTransportTab == 0 ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                      color: _selectedTransportTab == 0
+                          ? const Color(0xFF0284C7)
+                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -283,7 +319,9 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: _selectedTransportTab == 0 ? FontWeight.bold : FontWeight.w600,
-                        color: _selectedTransportTab == 0 ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                        color: _selectedTransportTab == 0
+                            ? const Color(0xFF0284C7)
+                            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                       ),
                     ),
                   ],
@@ -297,10 +335,12 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 9),
                 decoration: BoxDecoration(
-                  color: _selectedTransportTab == 1 ? Colors.white : Colors.transparent,
+                  color: _selectedTransportTab == 1
+                      ? (isDark ? const Color(0xFF0F172A) : Colors.white)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: _selectedTransportTab == 1
-                      ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
+                      ? [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.06), blurRadius: 4, offset: const Offset(0, 2))]
                       : null,
                 ),
                 child: Row(
@@ -309,15 +349,19 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                     Icon(
                       Icons.bluetooth,
                       size: 16,
-                      color: _selectedTransportTab == 1 ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                      color: _selectedTransportTab == 1
+                          ? const Color(0xFF0284C7)
+                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      "Bluetooth (Classic/BLE)",
+                      "Bluetooth (Classic / BLE)",
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: _selectedTransportTab == 1 ? FontWeight.bold : FontWeight.w600,
-                        color: _selectedTransportTab == 1 ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                        color: _selectedTransportTab == 1
+                            ? const Color(0xFF0284C7)
+                            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                       ),
                     ),
                   ],
@@ -394,6 +438,8 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
               _buildWifiOffBanner()
             else if (isPermMissing)
               _buildWifiPermissionBanner()
+            else if (!ws.isLocationEnabled)
+              _buildWifiLocationOffBanner()
             else
               _buildWifiPermissionStatusChip(),
 
@@ -437,9 +483,9 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: subBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: cardBorder),
       ),
       child: Row(
         children: [
@@ -452,10 +498,10 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
             ),
           ),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
               "Wi-Fi & Location Permissions: Active",
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textPrimary),
             ),
           ),
           InkWell(
@@ -512,6 +558,63 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
             ),
             onPressed: () => state.wifiService.openWifiSettings(),
             child: const Text("Turn On", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWifiLocationOffBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.location_off, color: Color(0xFFD97706), size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Location (GPS) is Turned OFF",
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  "Android requires Location Services to be ON in your phone's notification bar to discover nearby Wi-Fi APs and read connected Wi-Fi names.",
+                  style: TextStyle(fontSize: 11, color: Color(0xFFB45309)),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD97706),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    minimumSize: const Size(100, 32),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () async {
+                    await state.wifiService.openLocationSettings();
+                    await Future.delayed(const Duration(milliseconds: 1000));
+                    await state.wifiService.checkLocationEnabled();
+                    if (state.wifiService.isLocationEnabled) {
+                      state.wifiService.scanRealWifiNetworks();
+                      state.wifiService.refreshConnectedWifi();
+                    }
+                  },
+                  icon: const Icon(Icons.location_on, size: 14),
+                  label: const Text("Turn On Location in Settings", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -622,22 +725,22 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: Text(
             isRobotConnected ? "Currently Connected Robot (Wi-Fi)" : "Phone Wi-Fi Network",
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textPrimary),
           ),
         ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardBg,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isRobotConnected ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+              color: isRobotConnected ? const Color(0xFF10B981) : cardBorder,
               width: isRobotConnected ? 1.5 : 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: isRobotConnected ? const Color(0x0C059669) : const Color(0x050F172A),
+                color: isDark ? Colors.black.withOpacity(0.3) : (isRobotConnected ? const Color(0x0C059669) : const Color(0x050F172A)),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
@@ -668,7 +771,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.5,
-                          color: isRobotConnected ? const Color(0xFF059669) : const Color(0xFF64748B),
+                          color: isRobotConnected ? const Color(0xFF059669) : textSecondary,
                         ),
                       ),
                     ],
@@ -677,7 +780,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: isRobotConnected ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                        color: isRobotConnected ? const Color(0xFFECFDF5) : chipBg,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -686,7 +789,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           fontFamily: 'monospace',
-                          color: isRobotConnected ? const Color(0xFF059669) : const Color(0xFF475569),
+                          color: isRobotConnected ? const Color(0xFF059669) : textSecondary,
                         ),
                       ),
                     ),
@@ -698,13 +801,13 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: isRobotConnected ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                      color: isRobotConnected ? const Color(0xFFF0FDF4) : subBg,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
                       Icons.wifi,
                       size: 26,
-                      color: isRobotConnected ? const Color(0xFF059669) : const Color(0xFF64748B),
+                      color: isRobotConnected ? const Color(0xFF059669) : textSecondary,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -714,7 +817,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                       children: [
                         Text(
                           ssid,
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textPrimary),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
@@ -724,7 +827,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                                   ? "Phone IP: ${info.ip} • Gateway: ${info.gateway}"
                                   : "http://${ws.currentHost}:${ws.currentPort}")
                               : (info != null ? "Phone IP: ${info.ip} • Robot Offline" : "Robot Disconnected"),
-                          style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF64748B)),
+                          style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: textSecondary),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -778,7 +881,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
               ),
               if (isRobotConnected && ws.isConnected) ...[
                 const SizedBox(height: 14),
-                const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                Divider(height: 1, color: cardBorder),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -798,7 +901,46 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
 
   Widget _buildSavedWifiNetworksSection() {
     final ws = state.wifiService;
-    final saved = ws.savedWifiProfiles;
+
+    // Combine state.pairedProfiles (Wi-Fi) with ws.savedWifiProfiles
+    final Map<String, DeviceProfile> combined = {};
+    for (var p in state.pairedProfiles) {
+      if (p.protocol.contains("Wi-Fi") || p.protocol.contains("WiFi")) {
+        combined[p.name.toLowerCase()] = p;
+      }
+    }
+    for (var p in ws.savedWifiProfiles) {
+      combined[p.name.toLowerCase()] = p;
+    }
+
+    // If phone is currently connected to a Wi-Fi network, include it in saved profiles
+    if (ws.currentPhoneWifi != null && ws.currentPhoneWifi!.ssid.isNotEmpty && ws.currentPhoneWifi!.ssid != "<unknown ssid>") {
+      final phoneSsid = ws.currentPhoneWifi!.ssid;
+      if (!combined.containsKey(phoneSsid.toLowerCase())) {
+        final currentNetProfile = DeviceProfile(
+          id: "wifi-${phoneSsid.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}",
+          name: phoneSsid,
+          macAddress: ws.currentPhoneWifi!.bssid.isNotEmpty ? ws.currentPhoneWifi!.bssid : "00:00:00:00:00:00",
+          ipAddress: ws.currentPhoneWifi!.gateway.isNotEmpty ? ws.currentPhoneWifi!.gateway : ws.currentPhoneWifi!.ip,
+          protocol: ws.currentPhoneWifi!.isEspHotspot ? "Wi-Fi (SoftAP)" : "Wi-Fi (LAN)",
+          deviceType: "Rover",
+          lastConnected: DateTime.now(),
+          rssi: ws.currentPhoneWifi!.rssi,
+          isPaired: true,
+        );
+        combined[phoneSsid.toLowerCase()] = currentNetProfile;
+      }
+    }
+
+    // If RobotState is actively connected to a Wi-Fi robot device, include it
+    if (state.isConnected && (state.currentDevice.protocol.contains("Wi-Fi") || state.currentDevice.protocol.contains("WiFi"))) {
+      final dev = state.currentDevice;
+      if (dev.name.isNotEmpty && !combined.containsKey(dev.name.toLowerCase())) {
+        combined[dev.name.toLowerCase()] = DeviceProfile.fromRoboticDevice(dev);
+      }
+    }
+
+    final List<DeviceProfile> saved = combined.values.whereType<DeviceProfile>().toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -806,30 +948,53 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               "SAVED WI-FI DEVICES & NETWORKS",
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
-                color: Color(0xFF475569),
+                color: textSecondary,
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE2E8F0),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                "${saved.length} • Saved",
-                style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'monospace',
-                  color: Color(0xFF334155),
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline, size: 18, color: Color(0xFF0284C7)),
+                  tooltip: "Add Saved Wi-Fi Network",
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => _showAddCustomWifiDialog(),
                 ),
-              ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 18, color: Color(0xFF0284C7)),
+                  tooltip: "Reload Saved Wi-Fi",
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () async {
+                    await ws.loadSavedNetworks();
+                    if (mounted) setState(() {});
+                  },
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: chipBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    "${saved.length} • Saved",
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'monospace',
+                      color: textPrimary,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -838,37 +1003,37 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: cardBorder),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: Color(0xFF94A3B8)),
-                SizedBox(width: 8),
+                Icon(Icons.info_outline, size: 16, color: textSecondary),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     "No saved Wi-Fi networks yet. Connect to a nearby ESP or Wi-Fi network below to save it.",
-                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    style: TextStyle(fontSize: 11, color: textSecondary),
                   ),
                 ),
               ],
             ),
           )
         else
-          ...saved.map((profile) {
+          ...saved.map((DeviceProfile profile) {
             final isLive = (state.isConnected || ws.isConnected) &&
                 (ws.currentDeviceName?.toLowerCase() == profile.name.toLowerCase() ||
                     state.currentDevice.name.toLowerCase() == profile.name.toLowerCase() ||
-                    ws.currentPhoneWifi?.ssid.toLowerCase() == profile.name.toLowerCase());
+                    (ws.currentPhoneWifi != null && ws.currentPhoneWifi!.ssid.toLowerCase() == profile.name.toLowerCase()));
 
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardBg,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isLive ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+                  color: isLive ? const Color(0xFF10B981) : cardBorder,
                   width: isLive ? 1.5 : 1,
                 ),
               ),
@@ -878,7 +1043,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: isLive ? const Color(0xFFECFDF5) : const Color(0xFFF0F9FF),
+                    color: isLive ? const Color(0xFFECFDF5) : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF0F9FF)),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -892,10 +1057,22 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                     Flexible(
                       child: Text(
                         profile.name,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    if (profile.isRobotDevice || profile.name.toLowerCase().contains("ibots")) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: const Text("★ ESP ROBOT", style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
+                      ),
+                    ],
                     if (isLive) ...[
                       const SizedBox(width: 6),
                       Container(
@@ -912,7 +1089,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                 ),
                 subtitle: Text(
                   "${profile.protocol} • Saved Profile • ${_formatDateTime(profile.lastConnected)}",
-                  style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 10, color: textSecondary),
                 ),
                 onTap: () {
                   final matching = ws.availableNetworks.firstWhere(
@@ -934,11 +1111,13 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                     IconButton(
                       tooltip: "Forget Network",
                       icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFF94A3B8)),
-                      onPressed: () {
-                        ws.forgetNetwork(profile.id);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Removed ${profile.name} from saved profiles")),
-                        );
+                      onPressed: () async {
+                        await state.forgetProfile(profile.id);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Removed ${profile.name} from saved profiles")),
+                          );
+                        }
                       },
                     ),
                     ElevatedButton(
@@ -978,9 +1157,104 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
     );
   }
 
+  void _showAddCustomWifiDialog() {
+    final ssidCtrl = TextEditingController(text: "iBots-Robot");
+    final ipCtrl = TextEditingController(text: "192.168.4.1");
+    bool isSoftAp = true;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.wifi, color: Color(0xFF0284C7)),
+              SizedBox(width: 8),
+              Text("Add Saved Wi-Fi Robot", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Add your phone-saved ESP or robot Wi-Fi network profile to the controller:",
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: ssidCtrl,
+                decoration: InputDecoration(
+                  labelText: "Wi-Fi SSID / Network Name",
+                  hintText: "e.g. iBots-Robot or ESP32_AP",
+                  isDense: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ipCtrl,
+                decoration: InputDecoration(
+                  labelText: "Robot Gateway / IP Address",
+                  hintText: "192.168.4.1 or 192.168.1.100",
+                  isDense: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Checkbox(
+                    value: isSoftAp,
+                    activeColor: const Color(0xFF0284C7),
+                    onChanged: (v) => setDialogState(() => isSoftAp = v ?? true),
+                  ),
+                  const Text("ESP SoftAP Mode (192.168.4.1)", style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0284C7),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                final s = ssidCtrl.text.trim();
+                final ip = ipCtrl.text.trim().isEmpty ? "192.168.4.1" : ipCtrl.text.trim();
+                if (s.isEmpty) return;
+                Navigator.pop(ctx);
+                await state.wifiService.addCustomSavedNetwork(s, ip: ip, isSoftAp: isSoftAp);
+                if (mounted) {
+                  setState(() {});
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Added '$s' to Saved Wi-Fi Profiles!")),
+                  );
+                }
+              },
+              child: const Text("Save Network", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildAvailableWifiNetworksSection() {
     final ws = state.wifiService;
     final networks = ws.availableNetworks;
+    final visibleNetworks = _filterOnlyEspWifi
+        ? networks.where((n) => n.isEspDevice || n.isConnected || n.isSaved).toList()
+        : networks;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -988,61 +1262,140 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               "AVAILABLE NETWORKS NEARBY",
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
-                color: Color(0xFF475569),
+                color: textSecondary,
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE2E8F0),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                "${networks.length} • Visible",
-                style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'monospace',
-                  color: Color(0xFF334155),
+            Row(
+              children: [
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _filterOnlyEspWifi = !_filterOnlyEspWifi;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: _filterOnlyEspWifi ? (isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF)) : chipBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _filterOnlyEspWifi ? const Color(0xFF0284C7) : cardBorder,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _filterOnlyEspWifi ? Icons.filter_alt : Icons.filter_alt_outlined,
+                          size: 12,
+                          color: _filterOnlyEspWifi ? const Color(0xFF0284C7) : textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _filterOnlyEspWifi ? "Only ESP Robots" : "All Wi-Fi",
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: _filterOnlyEspWifi ? const Color(0xFF0284C7) : textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: chipBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    "${visibleNetworks.length} • Visible",
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'monospace',
+                      color: textPrimary,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
         const SizedBox(height: 8),
-        if (networks.isEmpty)
+        if (visibleNetworks.isEmpty)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: cardBorder),
             ),
             child: Row(
               children: [
-                const Icon(Icons.wifi_find, size: 20, color: Color(0xFF0284C7)),
+                Icon(
+                  !ws.isLocationEnabled ? Icons.location_off : Icons.wifi_find,
+                  size: 22,
+                  color: !ws.isLocationEnabled ? const Color(0xFFD97706) : const Color(0xFF0284C7),
+                ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    "No Wi-Fi networks found. Tap 'Scan Nearby Wi-Fi' at top or check that phone Location/GPS is enabled.",
-                    style: TextStyle(fontSize: 11.5, color: Color(0xFF475569)),
+                    !ws.isLocationEnabled
+                        ? "Location (GPS) is turned OFF in phone settings.\nAndroid requires Location to be ON to scan nearby Wi-Fi APs."
+                        : (networks.isEmpty
+                            ? "No Wi-Fi networks found. Tap 'Scan Nearby Wi-Fi' or pull down to refresh."
+                            : "No ESP robot Wi-Fi networks detected nearby.\nTap 'Show All' to view ${networks.length} regular Wi-Fi routers."),
+                    style: TextStyle(fontSize: 11.5, color: textSecondary),
                   ),
                 ),
-                TextButton(
-                  onPressed: () => ws.scanRealWifiNetworks(),
-                  child: const Text("Scan", style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
+                if (!ws.isLocationEnabled)
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD97706),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () async {
+                      await ws.openLocationSettings();
+                      await Future.delayed(const Duration(milliseconds: 1000));
+                      await ws.checkLocationEnabled();
+                      if (ws.isLocationEnabled) {
+                        ws.scanRealWifiNetworks();
+                        ws.refreshConnectedWifi();
+                      }
+                    },
+                    child: const Text("Turn On", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  )
+                else if (networks.isNotEmpty)
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _filterOnlyEspWifi = false;
+                      });
+                    },
+                    child: Text("Show All (${networks.length})", style: const TextStyle(fontWeight: FontWeight.bold)),
+                  )
+                else
+                  TextButton(
+                    onPressed: () => ws.scanRealWifiNetworks(),
+                    child: const Text("Scan", style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
               ],
             ),
           )
         else
-          ...networks.map((net) {
+          ...visibleNetworks.map((net) {
             final isConnected = (state.isConnected || ws.isConnected) &&
                 (net.isConnected ||
                     (ws.currentDeviceName?.toLowerCase() == net.ssid.toLowerCase()) ||
@@ -1052,12 +1405,12 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardBg,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: isConnected
                       ? const Color(0xFF10B981)
-                      : (net.isEspDevice ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0)),
+                      : (net.isEspDevice ? const Color(0xFF0284C7) : cardBorder),
                   width: (isConnected || net.isEspDevice) ? 1.5 : 1,
                 ),
               ),
@@ -1069,7 +1422,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                     Flexible(
                       child: Text(
                         net.ssid,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -1089,24 +1442,24 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
+                          color: chipBg,
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Text("SAVED", style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                        child: Text("SAVED", style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: textSecondary)),
                       ),
                     ],
                   ],
                 ),
                 subtitle: Text(
                   "${net.securityLabel} • ${net.is5Ghz ? '5 GHz' : '2.4 GHz'} • ${net.level} dBm",
-                  style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: textSecondary),
                 ),
                 trailing: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isConnected
                         ? const Color(0xFF059669)
-                        : (net.isEspDevice ? const Color(0xFF0284C7) : const Color(0xFFF1F5F9)),
-                    foregroundColor: (isConnected || net.isEspDevice) ? Colors.white : const Color(0xFF334155),
+                        : (net.isEspDevice ? const Color(0xFF0284C7) : chipBg),
+                    foregroundColor: (isConnected || net.isEspDevice) ? Colors.white : textPrimary,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     minimumSize: const Size(64, 32),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -1173,13 +1526,13 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          side: const BorderSide(color: Color(0xFFCBD5E1)),
+          side: BorderSide(color: cardBorder),
         ),
         onPressed: () => state.wifiService.openWifiSettings(),
-        icon: const Icon(Icons.settings, size: 16, color: Color(0xFF475569)),
-        label: const Text(
+        icon: Icon(Icons.settings, size: 16, color: textSecondary),
+        label: Text(
           "Open Phone's Native Wi-Fi Settings Panel",
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary),
         ),
       ),
     );
@@ -1205,11 +1558,11 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           children: [
             Icon(icon, size: 14, color: color),
             const SizedBox(width: 4),
-            Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+            Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: textPrimary)),
           ],
         ),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
+        Text(label, style: TextStyle(fontSize: 9, color: textSecondary)),
       ],
     );
   }
@@ -1218,7 +1571,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE2E8F0),
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -1229,23 +1582,23 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 9),
                 decoration: BoxDecoration(
-                  color: _wifiMode == 0 ? Colors.white : Colors.transparent,
+                  color: _wifiMode == 0 ? (isDark ? const Color(0xFF0F172A) : Colors.white) : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: _wifiMode == 0
-                      ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
+                      ? [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.06), blurRadius: 4, offset: const Offset(0, 2))]
                       : null,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.router, size: 15, color: _wifiMode == 0 ? const Color(0xFF059669) : const Color(0xFF64748B)),
+                    Icon(Icons.router, size: 15, color: _wifiMode == 0 ? const Color(0xFF059669) : textSecondary),
                     const SizedBox(width: 6),
                     Text(
                       "1. Local Network",
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: _wifiMode == 0 ? FontWeight.bold : FontWeight.w600,
-                        color: _wifiMode == 0 ? const Color(0xFF059669) : const Color(0xFF64748B),
+                        color: _wifiMode == 0 ? const Color(0xFF059669) : textSecondary,
                       ),
                     ),
                   ],
@@ -1259,23 +1612,23 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 9),
                 decoration: BoxDecoration(
-                  color: _wifiMode == 1 ? Colors.white : Colors.transparent,
+                  color: _wifiMode == 1 ? (isDark ? const Color(0xFF0F172A) : Colors.white) : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: _wifiMode == 1
-                      ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
+                      ? [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.06), blurRadius: 4, offset: const Offset(0, 2))]
                       : null,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.wifi_tethering, size: 15, color: _wifiMode == 1 ? const Color(0xFF0284C7) : const Color(0xFF64748B)),
+                    Icon(Icons.wifi_tethering, size: 15, color: _wifiMode == 1 ? const Color(0xFF0284C7) : textSecondary),
                     const SizedBox(width: 6),
                     Text(
                       "2. ESP Hotspot (SoftAP)",
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: _wifiMode == 1 ? FontWeight.bold : FontWeight.w600,
-                        color: _wifiMode == 1 ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                        color: _wifiMode == 1 ? const Color(0xFF0284C7) : textSecondary,
                       ),
                     ),
                   ],
@@ -1293,14 +1646,14 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3), width: 1.5),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x06000000),
+            color: isDark ? Colors.black.withOpacity(0.3) : const Color(0x06000000),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -1314,62 +1667,38 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
+                  color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.router, color: Color(0xFF059669), size: 20),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       "Mode 1: Wi-Fi — Local Network",
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrimary),
                     ),
                     Text(
                       "Connect through your home / office Wi-Fi router",
-                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      style: TextStyle(fontSize: 11, color: textSecondary),
                     ),
                   ],
                 ),
               ),
+              IconButton(
+                icon: const Icon(Icons.info_outline, color: Color(0xFF059669)),
+                tooltip: "Mode 1 Info",
+                onPressed: () => showWifiModeInfoDialog(context, mode: 0),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-
-          // Overview description banner
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFBBF7D0)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "The ESP32 and phone connect to the same Wi-Fi router. The app communicates with the ESP32 using its local IP address.",
-                  style: TextStyle(fontSize: 11.5, color: Color(0xFF1E293B), height: 1.35),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  "Best for local control",
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
-                ),
-                const SizedBox(height: 4),
-                _buildCheckBullet("Control hardware and monitor sensors."),
-                _buildCheckBullet("No cloud server required."),
-                _buildCheckBullet("Internet access is not necessary once the local network is set up."),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // Quick IP Presets
-          const Text("QUICK IP PRESETS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+          Text("QUICK IP PRESETS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textSecondary)),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -1392,7 +1721,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("ESP IP Address / Host", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                    Text("ESP IP Address / Host", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textSecondary)),
                     const SizedBox(height: 4),
                     TextField(
                       controller: _lanIpController,
@@ -1400,9 +1729,10 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                         hintText: "192.168.1.100 or esp32.local",
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cardBorder)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cardBorder)),
                       ),
-                      style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                      style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: textPrimary),
                     ),
                   ],
                 ),
@@ -1413,7 +1743,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Port", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                    Text("Port", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textSecondary)),
                     const SizedBox(height: 4),
                     TextField(
                       controller: _lanPortController,
@@ -1422,9 +1752,10 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                         hintText: "80",
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cardBorder)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cardBorder)),
                       ),
-                      style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                      style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: textPrimary),
                     ),
                   ],
                 ),
@@ -1459,16 +1790,16 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           // Discovered LAN Devices List
           if (state.wifiService.discoveredLanDevices.isNotEmpty) ...[
             const SizedBox(height: 12),
-            const Text("DISCOVERED ESP NODES ON ROUTER:", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+            Text("DISCOVERED ESP NODES ON ROUTER:", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textSecondary)),
             const SizedBox(height: 6),
             ...state.wifiService.discoveredLanDevices.map((d) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 6),
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: subBg,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: cardBorder),
                 ),
                 child: Row(
                   children: [
@@ -1478,8 +1809,8 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(d.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          Text("${d.ip}:${d.port} • Ping: ${d.pingMs}ms", style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF64748B))),
+                          Text(d.name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary)),
+                          Text("${d.ip}:${d.port} • Ping: ${d.pingMs}ms", style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: textSecondary)),
                         ],
                       ),
                     ),
@@ -1556,18 +1887,20 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
   }
 
   Widget _buildSoftApCard() {
-    final isSoftApConnected = state.wifiService.isConnected && state.wifiService.currentMode == WifiMode.softAp;
+    final ws = state.wifiService;
+    final phoneWifi = ws.currentPhoneWifi;
+    final isSoftApConnected = ws.isConnected && ws.currentMode == WifiMode.softAp;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.3), width: 1.5),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x06000000),
+            color: isDark ? Colors.black.withOpacity(0.3) : const Color(0x06000000),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -1581,108 +1914,70 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: isDark ? const Color(0xFF075985) : const Color(0xFFEFF6FF),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.wifi_tethering, color: Color(0xFF0284C7), size: 20),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       "Mode 2: ESP32 Hotspot (SoftAP)",
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrimary),
                     ),
                     Text(
                       "Direct point-to-point Wi-Fi connection without a router",
-                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      style: TextStyle(fontSize: 11, color: textSecondary),
                     ),
                   ],
                 ),
               ),
+              IconButton(
+                icon: const Icon(Icons.info_outline, color: Color(0xFF0284C7)),
+                tooltip: "Mode 2 Info",
+                onPressed: () => showWifiModeInfoDialog(context, mode: 1),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-
-          // Overview description banner
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "The ESP32 creates its own Wi-Fi network, and the phone connects directly to it.",
-                  style: TextStyle(fontSize: 11.5, color: Color(0xFF1E293B), height: 1.35),
-                ),
-                const SizedBox(height: 8),
-                _buildCheckBullet("Works without a Wi-Fi router."),
-                _buildCheckBullet("Useful for initial device configuration."),
-                _buildCheckBullet("Direct standalone control outdoors or in the field."),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
-                  ),
-                  child: const Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFD97706)),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          "The phone may lose internet access while connected to the ESP32 hotspot.",
-                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // Hotspot Credentials Box
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: subBg,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: cardBorder),
             ),
-            child: const Column(
+            child: Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("Gateway IP Address:", style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                    Text("192.168.4.1", style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    Text("Gateway IP Address:", style: TextStyle(fontSize: 11.5, color: textSecondary)),
+                    Text("192.168.4.1", style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: textPrimary)),
                   ],
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("Default SoftAP SSID:", style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                    Text("ESP32_iBots_Robot", style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                    Text("Target SoftAP SSID:", style: TextStyle(fontSize: 11.5, color: textSecondary)),
+                    Text(
+                      phoneWifi?.ssid ?? (ws.currentDeviceName ?? "Your ESP Hotspot"),
+                      style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+                    ),
                   ],
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("Default Password:", style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                    Text("12345678", style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    Text("Default Password:", style: TextStyle(fontSize: 11.5, color: textSecondary)),
+                    Text("12345678", style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: textPrimary)),
                   ],
                 ),
               ],
@@ -1691,10 +1986,10 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           const SizedBox(height: 16),
 
           // 3 Steps
-          const Text("QUICK CONNECTION STEPS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+          Text("QUICK CONNECTION STEPS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textSecondary)),
           const SizedBox(height: 8),
           _buildStepRow("1", "Turn ON your ESP32 robot board."),
-          _buildStepRow("2", "In phone Wi-Fi settings, connect to 'ESP32_iBots_Robot' (pass: 12345678)."),
+          _buildStepRow("2", "In phone Wi-Fi settings, connect to your ESP32 Hotspot."),
           _buildStepRow("3", "Tap the button below to link with 192.168.4.1."),
           const SizedBox(height: 16),
 
@@ -1717,17 +2012,19 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                   final isPhoneOnEsp = phoneWifi?.isEspHotspot ?? false;
 
                   if (!isPhoneOnEsp) {
-                    final espNet = state.wifiService.availableNetworks.firstWhere(
-                      (n) => n.isEspDevice || n.ssid.toLowerCase().contains("ibots") || n.ssid.toLowerCase().contains("robot"),
-                      orElse: () => const RealWifiNetwork(
-                        ssid: "iBots-Robot",
-                        bssid: "26:d7:eb:fd:bc:10",
-                        level: -38,
-                        frequency: 2412,
-                        capabilities: "[WPA2-PSK]",
-                      ),
-                    );
-                    _showWifiConnectDialog(espNet);
+                    final espCandidates = state.wifiService.availableNetworks.where(
+                      (n) => n.isEspDevice || n.ssid.toLowerCase().contains("esp") || n.ssid.toLowerCase().contains("robot"),
+                    ).toList();
+
+                    if (espCandidates.isNotEmpty) {
+                      _showWifiConnectDialog(espCandidates.first);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("No ESP Hotspot detected nearby. Power ON your robot or connect via phone Wi-Fi settings."),
+                        ),
+                      );
+                    }
                     return;
                   }
 
@@ -1756,27 +2053,14 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
 
   Widget _buildIpPresetChip(String ip) {
     return ActionChip(
-      label: Text(ip, style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
-      backgroundColor: const Color(0xFFF1F5F9),
-      side: const BorderSide(color: Color(0xFFCBD5E1)),
+      label: Text(ip, style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: textPrimary)),
+      backgroundColor: chipBg,
+      side: BorderSide(color: cardBorder),
       onPressed: () {
         setState(() {
           _lanIpController.text = ip;
         });
       },
-    );
-  }
-
-  Widget _buildCheckBullet(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("✓ ", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 11, color: Color(0xFF334155)))),
-        ],
-      ),
     );
   }
 
@@ -1797,7 +2081,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
             child: Text(step, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 11, color: Color(0xFF334155)))),
+          Expanded(child: Text(text, style: TextStyle(fontSize: 11, color: textPrimary))),
         ],
       ),
     );
@@ -1807,35 +2091,35 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: subBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.code, size: 16, color: Color(0xFF0284C7)),
-              SizedBox(width: 6),
+              const Icon(Icons.code, size: 16, color: Color(0xFF0284C7)),
+              const SizedBox(width: 6),
               Text(
                 "ESP32 Wi-Fi Command Protocol",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             "The app communicates via HTTP requests with minimal latency:",
-            style: TextStyle(fontSize: 11, color: Color(0xFF475569)),
+            style: TextStyle(fontSize: 11, color: textSecondary),
           ),
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardBg,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
+              border: Border.all(color: cardBorder),
             ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1990,37 +2274,37 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: subBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
-              Icon(Icons.info_outline, size: 16, color: Color(0xFF0284C7)),
-              SizedBox(width: 6),
+            children: [
+              const Icon(Icons.info_outline, size: 16, color: Color(0xFF0284C7)),
+              const SizedBox(width: 6),
               Text(
                 "How to make devices visible:",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             "• Scanning for another phone/laptop? Open Settings → Bluetooth on that device. Android & iPhone only broadcast their Bluetooth signal while their Bluetooth settings screen is open.",
-            style: TextStyle(fontSize: 11, color: Color(0xFF475569)),
+            style: TextStyle(fontSize: 11, color: textSecondary),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             "• Scanning for Arduino / HC-05? Ensure its red LED is blinking rapidly (ready to pair), or pair it once in phone Bluetooth settings with PIN 1234.",
-            style: TextStyle(fontSize: 11, color: Color(0xFF475569)),
+            style: TextStyle(fontSize: 11, color: textSecondary),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             "• Ensure Location (GPS) is turned ON in your phone's notification bar.",
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textPrimary),
           ),
         ],
       ),
@@ -2065,25 +2349,25 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 2),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
           child: Text(
             "Currently Connected Device",
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textPrimary),
           ),
         ),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardBg,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: const Color(0xFF10B981), width: 1.5),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Color(0x0A0F172A),
+                color: isDark ? Colors.black.withOpacity(0.3) : const Color(0x0A0F172A),
                 blurRadius: 16,
-                offset: Offset(0, 4),
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -2112,13 +2396,13 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                             children: [
                               Text(
                                 dev.name,
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrimary),
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 "${dev.protocol} • ${dev.macAddress}",
-                                style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF64748B)),
+                                style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: textSecondary),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
@@ -2145,8 +2429,8 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
               const SizedBox(height: 14),
               Container(
                 padding: const EdgeInsets.only(top: 10),
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: cardBorder)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2187,6 +2471,9 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
       }
     }
     final pairedList = combined.values.toList();
+    final filteredPaired = _filterOnlyRobotBt
+        ? pairedList.where((p) => p.isRobotDevice || (state.currentDevice.id == p.id && state.currentDevice.isConnected)).toList()
+        : pairedList;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2196,12 +2483,55 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Paired & Saved Devices",
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              Flexible(
+                child: Text(
+                  "Paired Devices",
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textPrimary),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 6),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _filterOnlyRobotBt = !_filterOnlyRobotBt;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _filterOnlyRobotBt ? (isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF)) : chipBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _filterOnlyRobotBt ? const Color(0xFF0284C7) : cardBorder,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _filterOnlyRobotBt ? Icons.filter_alt : Icons.filter_alt_outlined,
+                            size: 12,
+                            color: _filterOnlyRobotBt ? const Color(0xFF0284C7) : textSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _filterOnlyRobotBt ? "Only Robots" : "All Devices",
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: _filterOnlyRobotBt ? const Color(0xFF0284C7) : textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.refresh, size: 20, color: Color(0xFF0284C7)),
                     tooltip: "Reload Paired Devices",
@@ -2216,12 +2546,12 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE2E8F0),
+                      color: chipBg,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      "${pairedList.length} Saved",
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Color(0xFF475569)),
+                      "${filteredPaired.length} Saved",
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: textSecondary),
                     ),
                   ),
                 ],
@@ -2230,25 +2560,42 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           ),
         ),
         const SizedBox(height: 10),
-        if (pairedList.isEmpty)
+        if (filteredPaired.isEmpty)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: cardBorder),
             ),
-            child: const Center(
-              child: Text(
-                "No paired Bluetooth devices detected on your phone yet.\nTurn on a Bluetooth device or pair one in your phone's Settings.",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+            child: Center(
+              child: Column(
+                children: [
+                  Text(
+                    pairedList.isEmpty
+                        ? "No paired Bluetooth devices detected on your phone yet.\nTurn on a Bluetooth device or pair one in your phone's Settings."
+                        : "No paired Robot Bluetooth modules (HC-05, ESP32, JDY) found.\nTap below to view all ${pairedList.length} paired devices (headphones, smartwatches, etc.).",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: textSecondary),
+                  ),
+                  if (pairedList.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _filterOnlyRobotBt = false;
+                        });
+                      },
+                      child: const Text("Show All Paired Devices", style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ],
               ),
             ),
           )
         else
           Column(
-            children: pairedList.map((item) {
+            children: filteredPaired.map((item) {
               final isLiveConnected = state.currentDevice.id == item.id && state.currentDevice.isConnected;
               final isConnecting = state.connectionStatus == ConnectionStatus.connecting && state.targetDevice?.id == item.id;
 
@@ -2256,14 +2603,14 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isLiveConnected ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+                    color: isLiveConnected ? const Color(0xFF10B981) : cardBorder,
                     width: isLiveConnected ? 1.5 : 1,
                   ),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x050F172A), blurRadius: 4, offset: Offset(0, 1)),
+                  boxShadow: [
+                    BoxShadow(color: isDark ? Colors.black.withOpacity(0.2) : const Color(0x050F172A), blurRadius: 4, offset: const Offset(0, 1)),
                   ],
                 ),
                 child: Row(
@@ -2276,10 +2623,10 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: isLiveConnected ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                              color: isLiveConnected ? const Color(0xFFECFDF5) : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Icon(_getIconForType(item.deviceType), size: 20, color: isLiveConnected ? const Color(0xFF059669) : const Color(0xFF475569)),
+                            child: Icon(_getIconForType(item.deviceType), size: 20, color: isLiveConnected ? const Color(0xFF059669) : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569))),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -2291,10 +2638,22 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                                     Flexible(
                                       child: Text(
                                         item.name,
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
+                                    if (item.isRobotDevice) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFEF3C7),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFFFDE68A)),
+                                        ),
+                                        child: const Text("★ ROBOT", style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
+                                      ),
+                                    ],
                                     if (isLiveConnected) ...[
                                       const SizedBox(width: 6),
                                       const Text("• CONNECTED", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
@@ -2304,7 +2663,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                                 const SizedBox(height: 2),
                                 Text(
                                   item.macAddress,
-                                  style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF64748B)),
+                                  style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: textSecondary),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ],
@@ -2357,6 +2716,9 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
 
   Widget _buildAvailableDiscoveredSection() {
     final discovered = state.nearbyDiscoveredDevices;
+    final filteredDiscovered = _filterOnlyRobotBt
+        ? discovered.where((d) => d.isRobotDevice || (state.currentDevice.id == d.id && state.currentDevice.isConnected)).toList()
+        : discovered;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2366,12 +2728,55 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Available Nearby Devices",
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              Flexible(
+                child: Text(
+                  "Nearby Devices",
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textPrimary),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 6),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _filterOnlyRobotBt = !_filterOnlyRobotBt;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _filterOnlyRobotBt ? (isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF)) : chipBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _filterOnlyRobotBt ? const Color(0xFF0284C7) : cardBorder,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _filterOnlyRobotBt ? Icons.filter_alt : Icons.filter_alt_outlined,
+                            size: 12,
+                            color: _filterOnlyRobotBt ? const Color(0xFF0284C7) : textSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _filterOnlyRobotBt ? "Only Robots" : "All Devices",
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: _filterOnlyRobotBt ? const Color(0xFF0284C7) : textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   if (state.isScanning)
                     const Text(
                       "Scanning...  ",
@@ -2396,19 +2801,21 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           ),
         ),
         const SizedBox(height: 10),
-        if (discovered.isEmpty)
+        if (filteredDiscovered.isEmpty)
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: cardBorder),
             ),
             child: Center(
               child: Column(
                 children: [
                   Icon(
-                    state.isScanning ? Icons.radar : Icons.bluetooth_searching,
+                    state.isScanning
+                        ? Icons.radar
+                        : (_filterOnlyRobotBt && discovered.isNotEmpty ? Icons.filter_alt_off : Icons.bluetooth_searching),
                     size: 36,
                     color: state.isScanning ? const Color(0xFF0284C7) : const Color(0xFF94A3B8),
                   ),
@@ -2416,17 +2823,30 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                   Text(
                     state.isScanning
                         ? "Scanning for Bluetooth & BLE devices nearby..."
-                        : "No nearby Bluetooth devices discovered yet.\nTap 'Scan' to search for active Bluetooth devices in your room.",
+                        : (_filterOnlyRobotBt && discovered.isNotEmpty
+                            ? "No Robot Bluetooth modules detected in scan.\nTap 'Show All' to view ${discovered.length} other Bluetooth devices."
+                            : "No nearby Bluetooth devices discovered yet.\nTap 'Scan' to search for active Bluetooth devices in your room."),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    style: TextStyle(fontSize: 12, color: textSecondary),
                   ),
+                  if (_filterOnlyRobotBt && discovered.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _filterOnlyRobotBt = false;
+                        });
+                      },
+                      child: const Text("Show All Devices", style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
                 ],
               ),
             ),
           )
         else
           Column(
-            children: discovered.map((dev) {
+            children: filteredDiscovered.map((dev) {
               final isConnected = state.currentDevice.id == dev.id && state.currentDevice.isConnected;
               final isConnecting = state.connectionStatus == ConnectionStatus.connecting && state.targetDevice?.id == dev.id;
 
@@ -2434,11 +2854,11 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isConnected ? const Color(0xFF10B981) : const Color(0xFFE2E8F0)),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x040F172A), blurRadius: 4, offset: Offset(0, 1)),
+                  border: Border.all(color: isConnected ? const Color(0xFF10B981) : cardBorder),
+                  boxShadow: [
+                    BoxShadow(color: isDark ? Colors.black.withOpacity(0.2) : const Color(0x040F172A), blurRadius: 4, offset: const Offset(0, 1)),
                   ],
                 ),
                 child: Row(
@@ -2451,10 +2871,10 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF0F9FF),
+                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF0F9FF),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Icon(_getIconForType(dev.deviceType), size: 20, color: const Color(0xFF0284C7)),
+                            child: const Icon(Icons.bluetooth, size: 20, color: Color(0xFF0284C7)),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -2466,10 +2886,22 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                                     Flexible(
                                       child: Text(
                                         dev.name,
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
+                                    if (dev.isRobotDevice) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFEF3C7),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFFFDE68A)),
+                                        ),
+                                        child: const Text("★ ROBOT", style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
+                                      ),
+                                    ],
                                     const SizedBox(width: 6),
                                     _buildSignalBadge(dev.rssi),
                                   ],
@@ -2477,7 +2909,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                                 const SizedBox(height: 2),
                                 Text(
                                   dev.macAddress,
-                                  style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF64748B)),
+                                  style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: textSecondary),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ],

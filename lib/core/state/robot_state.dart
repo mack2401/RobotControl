@@ -86,22 +86,14 @@ class RobotState extends ChangeNotifier {
           deviceType: "Rover",
         )).toList();
 
-        nearbyDiscoveredDevices = [
-          const RoboticDevice(
-            id: "esp-softap-default",
-            name: "ESP32 Hotspot (SoftAP)",
-            macAddress: "Gateway: 192.168.4.1",
-            ipAddress: "192.168.4.1",
-            protocol: "Wi-Fi (SoftAP)",
-            rssi: -35,
-            deviceType: "Rover",
-          ),
-          ...lanDevices,
-        ];
+        nearbyDiscoveredDevices = lanDevices;
       }
     }
     notifyListeners();
   }
+
+  /// Alias for sendPayload
+  void sendCommand(String cmd) => sendPayload(cmd);
 
   /// Unified transport dispatcher: Routes commands to Wi-Fi or Bluetooth automatically
   void sendPayload(String data) {
@@ -170,15 +162,15 @@ class RobotState extends ChangeNotifier {
   bool isScanning = false;
 
   RoboticDevice currentDevice = const RoboticDevice(
-    id: "ibt-classic-01",
-    name: "iBots Mecanum 4WD (Classic)",
-    macAddress: "00:1A:7D:DA:71:13",
-    ipAddress: "192.168.4.10",
-    protocol: "Bluetooth (Classic)",
-    rssi: -48,
+    id: "none",
+    name: "No Device Connected",
+    macAddress: "--:--:--:--:--:--",
+    ipAddress: "",
+    protocol: "None",
     isConnected: false,
-    batteryVoltage: 8.4,
-    pingMs: 12,
+    rssi: 0,
+    batteryVoltage: 0.0,
+    pingMs: 0,
     deviceType: "Rover",
   );
 
@@ -192,6 +184,16 @@ class RobotState extends ChangeNotifier {
   Future<void> _loadPairedProfiles() async {
     pairedProfiles = await database.getAllProfiles();
     notifyListeners();
+  }
+
+  Future<void> reloadPairedProfiles() async {
+    await _loadPairedProfiles();
+    await wifiService.loadSavedNetworks();
+  }
+
+  Future<void> forgetProfile(String id) async {
+    await database.deleteProfile(id);
+    await reloadPairedProfiles();
   }
 
   void setProtocol(String protocol) {
@@ -211,97 +213,36 @@ class RobotState extends ChangeNotifier {
   }
 
   void _refreshNearbyForProtocol(String protocol) {
-    if (protocol.contains("Classic")) {
-      nearbyDiscoveredDevices = [
-        const RoboticDevice(
-          id: "bt-hc05-01",
-          name: "iBots HC-05 SPP Bridge",
-          macAddress: "00:14:03:05:58:20",
-          ipAddress: "192.168.4.15",
-          protocol: "Bluetooth (Classic)",
-          rssi: -42,
-          deviceType: "Rover",
-        ),
-        const RoboticDevice(
-          id: "bt-mecanum-02",
-          name: "iBots Mecanum 4WD",
-          macAddress: "00:1A:7D:DA:71:13",
-          ipAddress: "192.168.4.10",
-          protocol: "Bluetooth (Classic)",
-          rssi: -48,
-          deviceType: "Rover",
-        ),
-        const RoboticDevice(
-          id: "bt-nano-03",
-          name: "Arduino Nano Bluetooth",
-          macAddress: "98:D3:31:FC:2B:7A",
-          ipAddress: "192.168.4.18",
-          protocol: "Bluetooth (Classic)",
-          rssi: -68,
-          deviceType: "Rover",
-        ),
-      ];
-    } else if (protocol.contains("BLE")) {
-      nearbyDiscoveredDevices = [
-        const RoboticDevice(
-          id: "ibt-4899",
-          name: "iBots Rover ESP32-WROOM",
-          macAddress: "24:6F:28:B2:1A:40",
-          ipAddress: "192.168.4.1",
-          protocol: "BLE 5.2",
-          rssi: -54,
-          deviceType: "Rover",
-        ),
-        const RoboticDevice(
-          id: "ibt-arm-06",
-          name: "iBots 6-DOF Robotic Arm",
-          macAddress: "A4:CF:12:D5:78:10",
-          ipAddress: "192.168.4.3",
-          protocol: "BLE 5.2",
-          rssi: -71,
-          deviceType: "Arm",
-        ),
-        const RoboticDevice(
-          id: "esp-relay-08",
-          name: "ESP32-S3 SmartRelay Node",
-          macAddress: "7C:DF:A1:40:9B:12",
-          ipAddress: "192.168.4.8",
-          protocol: "BLE 5.2",
-          rssi: -59,
-          deviceType: "Relay",
-        ),
-      ];
+    if (protocol.contains("Classic") || protocol.contains("BLE") || protocol.contains("Bluetooth")) {
+      nearbyDiscoveredDevices = List.from(bleService.realNearbyDevices);
     } else {
-      // Wi-Fi (SoftAP / LAN)
-      nearbyDiscoveredDevices = [
-        const RoboticDevice(
-          id: "esp-softap-default",
-          name: "ESP32 Hotspot (SoftAP)",
-          macAddress: "Gateway: 192.168.4.1",
-          ipAddress: "192.168.4.1",
-          protocol: "Wi-Fi (SoftAP)",
-          rssi: -35,
-          deviceType: "Rover",
-        ),
-        const RoboticDevice(
-          id: "esp-lan-default",
-          name: "ESP32 Local Network (Router)",
-          macAddress: "Host: esp32.local",
-          ipAddress: "esp32.local",
+      // Wi-Fi (Real scanned APs + discovered LAN ESPs)
+      final List<RoboticDevice> list = [];
+      for (var d in wifiService.discoveredLanDevices) {
+        list.add(RoboticDevice(
+          id: "wifi-${d.ip.replaceAll('.', '-')}",
+          name: d.name,
+          macAddress: "IP: ${d.ip}:${d.port}",
+          ipAddress: d.ip,
           protocol: "Wi-Fi (LAN)",
-          rssi: -50,
+          rssi: -45,
+          pingMs: d.pingMs,
           deviceType: "Rover",
-        ),
-        const RoboticDevice(
-          id: "ibt-cam-02",
-          name: "iBots ESP32-CAM Streamer",
-          macAddress: "IP: 192.168.4.1:81",
-          ipAddress: "192.168.4.1",
-          protocol: "Wi-Fi (SoftAP)",
-          rssi: -52,
-          deviceType: "Cam",
-        ),
-      ];
+        ));
+      }
+      for (var n in wifiService.availableNetworks) {
+        list.add(RoboticDevice(
+          id: "wifi-${n.ssid.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}",
+          name: n.ssid,
+          macAddress: n.bssid.isNotEmpty ? n.bssid : (n.isEspDevice ? "192.168.4.1" : "Wi-Fi AP"),
+          ipAddress: n.isEspDevice ? "192.168.4.1" : "",
+          protocol: n.isEspDevice ? "Wi-Fi (SoftAP)" : "Wi-Fi (LAN)",
+          rssi: n.level,
+          deviceType: n.isEspDevice ? "Rover" : "Gateway",
+          isConnected: n.isConnected,
+        ));
+      }
+      nearbyDiscoveredDevices = list;
     }
   }
 
@@ -370,27 +311,6 @@ class RobotState extends ChangeNotifier {
 
     addTerminalLog("[${dev.protocol}] Handshake initiated with ${dev.name} (${dev.macAddress})...", LogType.bluetooth);
 
-    const fakeMockMacs = {
-      "00:1A:7D:DA:71:13",
-      "00:14:03:05:58:20",
-      "98:D3:31:FC:2B:7A",
-      "24:6F:28:B2:1A:40",
-      "A4:CF:12:D5:78:10",
-      "7C:DF:A1:40:9B:12",
-    };
-
-    final bool isFakeMock = fakeMockMacs.contains(dev.macAddress.toUpperCase()) &&
-        (dev.id == "bt-hc05-01" ||
-            dev.id == "bt-mecanum-02" ||
-            dev.id == "bt-nano-03" ||
-            dev.id == "ibt-classic-01" ||
-            dev.id == "ibt-4899");
-
-    final bool isRealHardware = !isFakeMock &&
-        (dev.id.startsWith("real-") ||
-            dev.id.startsWith("bonded-") ||
-            RegExp(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$').hasMatch(dev.macAddress));
-
     final bool isWifiProto = dev.protocol.contains("Wi-Fi") || dev.protocol.contains("WiFi");
 
     bool success = false;
@@ -402,14 +322,9 @@ class RobotState extends ChangeNotifier {
         mode: isSoftAp ? WifiMode.softAp : WifiMode.localNetwork,
         name: dev.name,
       );
-    } else if (isRealHardware) {
-      addTerminalLog("[SYS] Connecting to real hardware ${dev.macAddress}...", LogType.system);
-      success = await bleService.connect(dev);
     } else {
-      // Mock demo device tapped: Do NOT claim connection!
-      await Future.delayed(const Duration(milliseconds: 600));
-      addTerminalLog("[DEMO] '${dev.name}' is a sample demo profile. Pair your physical HC-05 in phone Bluetooth Settings and select it from 'Paired & Saved Devices'.", LogType.error);
-      success = false;
+      addTerminalLog("[SYS] Connecting to Bluetooth device ${dev.name} (${dev.macAddress})...", LogType.system);
+      success = await bleService.connect(dev);
     }
 
     if (success) {
@@ -489,6 +404,9 @@ class RobotState extends ChangeNotifier {
       selectTargetDevice(newDev);
       connectionStatus = ConnectionStatus.connected;
       currentDevice = newDev;
+      await database.saveProfile(DeviceProfile.fromRoboticDevice(newDev));
+      await _loadPairedProfiles();
+      await wifiService.loadSavedNetworks();
       addTerminalLog("[Wi-Fi] Connected to $devName ($host:$port) successfully!", LogType.system);
     } else {
       connectionStatus = ConnectionStatus.disconnected;
@@ -560,35 +478,111 @@ class RobotState extends ChangeNotifier {
     }
   }
 
-  bool useNumericMotionCommands = true; // Default true: 1=Forward, 2=Backward, 3=Left, 4=Right, 0=Stop
+  // 0 = Letters (F/B/L/R/S), 1 = Word (FORWARD/BACKWARD/LEFT/RIGHT/STOP), 2 = Numeric (1/2/3/4/0)
+  int motionProtocolMode = 1; // Default 1: Word protocol (FORWARD, LEFT, etc. for user's new bot)
+
+  bool get useNumericMotionCommands => motionProtocolMode == 2;
+  set useNumericMotionCommands(bool val) {
+    motionProtocolMode = val ? 2 : 0;
+    notifyListeners();
+  }
 
   void toggleMotionCommandProtocol() {
-    useNumericMotionCommands = !useNumericMotionCommands;
-    addTerminalLog(">>> PROTOCOL_SWITCH: ${useNumericMotionCommands ? 'NUMERIC (1/2/3/4/0)' : 'STANDARD (F/B/L/R/S)'}", LogType.system);
+    motionProtocolMode = (motionProtocolMode + 1) % 3;
+    final name = motionProtocolMode == 1
+        ? 'WORD (FORWARD/LEFT/STOP)'
+        : (motionProtocolMode == 2 ? 'NUMERIC (1/2/3/4/0)' : 'STANDARD (F/B/L/R/S)');
+    addTerminalLog(">>> PROTOCOL_SWITCH: $name", LogType.system);
     notifyListeners();
   }
 
   void sendCarMotionCommand(String cmd) {
     String out = cmd;
-    if (useNumericMotionCommands) {
-      switch (cmd.trim()) {
+    final trimmed = cmd.trim();
+    if (motionProtocolMode == 1) {
+      // WORD PROTOCOL: FORWARD, BACKWARD, LEFT, RIGHT, STOP
+      switch (trimmed) {
         case 'F':
         case 'U':
+        case '1':
+        case 'FORWARD':
+          out = 'FORWARD';
+          break;
+        case 'B':
+        case 'D':
+        case '2':
+        case 'BACKWARD':
+          out = 'BACKWARD';
+          break;
+        case 'L':
+        case '3':
+        case 'LEFT':
+          out = 'LEFT';
+          break;
+        case 'R':
+        case '4':
+        case 'RIGHT':
+          out = 'RIGHT';
+          break;
+        case 'S':
+        case '0':
+        case 'STOP':
+          out = 'STOP';
+          break;
+        default:
+          out = cmd;
+      }
+    } else if (motionProtocolMode == 2) {
+      // NUMERIC PROTOCOL: 1, 2, 3, 4, 0
+      switch (trimmed) {
+        case 'F':
+        case 'U':
+        case 'FORWARD':
           out = '1';
           break;
         case 'B':
         case 'D':
+        case 'BACKWARD':
           out = '2';
           break;
         case 'L':
+        case 'LEFT':
           out = '3';
           break;
         case 'R':
+        case 'RIGHT':
           out = '4';
           break;
         case 'S':
         case '0':
+        case 'STOP':
           out = '0';
+          break;
+        default:
+          out = cmd;
+      }
+    } else {
+      // STANDARD LETTERS: F, B, L, R, S
+      switch (trimmed) {
+        case '1':
+        case 'FORWARD':
+          out = 'F';
+          break;
+        case '2':
+        case 'BACKWARD':
+          out = 'B';
+          break;
+        case '3':
+        case 'LEFT':
+          out = 'L';
+          break;
+        case '4':
+        case 'RIGHT':
+          out = 'R';
+          break;
+        case '0':
+        case 'STOP':
+          out = 'S';
           break;
         default:
           out = cmd;
@@ -633,11 +627,10 @@ class RobotState extends ChangeNotifier {
     if (danceMode) {
       emergencyBrake = false;
       motionStatusText = "DANCE CHOREOGRAPHY ACTIVE";
-      sendPayload("X\n");
       addTerminalLog(">>> EXEC_ROUTINE: CHOREO_DANCE_01", LogType.tx);
     } else {
       motionStatusText = "IDLE • STANDBY";
-      sendCarMotionCommand("S");
+      sendCarMotionCommand("STOP");
     }
     notifyListeners();
   }
