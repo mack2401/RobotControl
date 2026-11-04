@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/models/device_model.dart';
 import '../core/state/robot_state.dart';
+import '../widgets/custom_commands_button.dart';
 
 class KeypadScreen extends StatefulWidget {
   const KeypadScreen({super.key});
@@ -51,24 +52,161 @@ class _KeypadScreenState extends State<KeypadScreen> {
     
     HapticFeedback.lightImpact();
 
+    final activeCmd = state.commandManager.getKeypadCommand(val);
+
     setState(() {
       currentBuffer += val;
-      lastTransmitted = val;
+      lastTransmitted = activeCmd;
     });
 
     if (instantSend) {
-      // Transmit single key command immediately over active link (Wi-Fi or Bluetooth)
-      state.sendPayload("$val\n");
-      state.addTerminalLog(">>> KEYPAD_TX: '$val'", LogType.tx);
-      state.addLog(LogType.cmd, 'KEYPAD: $val');
+      // Transmit resolved key command immediately over active link (Wi-Fi or Bluetooth)
+      state.sendPayload(activeCmd.endsWith('\n') ? activeCmd : "$activeCmd\n");
+      state.addTerminalLog(">>> KEYPAD_TX: '$activeCmd'", LogType.tx);
+      state.addLog(LogType.cmd, 'KEYPAD: $val -> $activeCmd');
       
       final bool isDevConnected = state.isConnected || state.wifiService.isConnected;
       if (!isDevConnected) {
-        _showToast('Key "$val" queued (Device not connected)', icon: Icons.sensors_off);
+        _showToast('Key "$val" ($activeCmd) queued (Device not connected)', icon: Icons.sensors_off);
       }
     } else {
-      state.addLog(LogType.cmd, 'BUFFER: $val');
+      state.addLog(LogType.cmd, 'BUFFER: $val (CMD: $activeCmd)');
     }
+  }
+
+  void _showKeypadCommandConfigDialog() {
+    final keys = ['1', '2', '3', 'A', '4', '5', '6', 'B', '7', '8', '9', 'C', '*', '0', '#', 'D'];
+    final controllers = {
+      for (final k in keys) k: TextEditingController(text: state.commandManager.getKeypadCustomOverride(k) ?? '')
+    };
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: cardBg,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.tune, color: Color(0xFF0284C7), size: 20),
+                    const SizedBox(width: 8),
+                    Text('Keypad Commands', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary)),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () {
+                    state.commandManager.resetAllKeypadCommands();
+                    for (final k in keys) {
+                      controllers[k]?.clear();
+                    }
+                    setDialogState(() {});
+                    setState(() {});
+                    _showToast('All keypad commands reset to default');
+                  },
+                  child: const Text('Reset All', style: TextStyle(fontSize: 12, color: Color(0xFFEF4444))),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 360,
+              height: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Configure the exact character or payload transmitted when pressing each key. Supports raw characters or HTTP endpoints (e.g. /keypad?k=1).',
+                      style: TextStyle(fontSize: 11, color: textSecondary),
+                    ),
+                    const SizedBox(height: 12),
+                    ...keys.map((k) {
+                      final activeCmd = state.commandManager.getKeypadCommand(k);
+                      final isCustom = state.commandManager.isKeypadCustomized(k);
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: subBg,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: cardBorder),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  k,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: (k == 'A' || k == 'B' || k == 'C' || k == 'D')
+                                        ? const Color(0xFF0284C7)
+                                        : (k == '*' || k == '#')
+                                            ? const Color(0xFFF59E0B)
+                                            : textPrimary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: controllers[k],
+                                style: const TextStyle(fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.w600),
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  filled: true,
+                                  fillColor: isCustom ? (isDark ? const Color(0xFF064E3B).withOpacity(0.3) : const Color(0xFFF0FDF4)) : subBg,
+                                  hintText: "Default: $k",
+                                  hintStyle: TextStyle(fontSize: 11, color: textSecondary.withOpacity(0.5)),
+                                  helperText: isCustom ? "Custom Active: $activeCmd" : null,
+                                  helperStyle: const TextStyle(fontSize: 9.5, color: Color(0xFF0284C7), fontWeight: FontWeight.bold),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: cardBorder)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: isCustom ? const Color(0xFF10B981) : cardBorder)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: TextStyle(color: textSecondary)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  for (final k in keys) {
+                    final txt = controllers[k]?.text.trim() ?? '';
+                    state.commandManager.setKeypadCommand(k, txt.isEmpty ? null : txt);
+                  }
+                  setState(() {});
+                  Navigator.pop(ctx);
+                  _showToast('Keypad commands saved');
+                },
+                child: const Text('Save All'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   void _backspaceDigit() {
@@ -161,6 +299,15 @@ class _KeypadScreenState extends State<KeypadScreen> {
                 ),
               ],
             ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 8.0),
+                child: CustomCommandsButton(
+                  onTap: _showKeypadCommandConfigDialog,
+                  isCustomized: state.commandManager.hasKeypadOverrides,
+                ),
+              ),
+            ],
           ),
           body: Stack(
             children: [
@@ -570,15 +717,23 @@ class _KeypadScreenState extends State<KeypadScreen> {
     if (isActionCol) mainColor = isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7);
     if (isSpecial) mainColor = isDark ? const Color(0xFFFBBF24) : const Color(0xFF854D0E);
 
+    final activeCmd = state.commandManager.getKeypadCommand(key);
+    final isCustom = state.commandManager.isKeypadCustomized(key);
+
     return InkWell(
       onTap: () => _appendKey(key),
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        height: 64,
+        height: 70,
         decoration: BoxDecoration(
           color: cardBg,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cardBorder),
+          border: Border.all(
+            color: isCustom
+                ? (isDark ? const Color(0xFF059669) : const Color(0xFF10B981))
+                : cardBorder,
+            width: isCustom ? 1.5 : 1,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.03),
@@ -590,15 +745,25 @@ class _KeypadScreenState extends State<KeypadScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              key,
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: mainColor,
-                height: 1.1,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  key,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: mainColor,
+                    height: 1.0,
+                  ),
+                ),
+                if (isCustom) ...[
+                  const SizedBox(width: 2),
+                  const Icon(Icons.circle, size: 5, color: Color(0xFF10B981)),
+                ],
+              ],
             ),
+            const SizedBox(height: 2),
             Text(
               sub,
               style: TextStyle(
@@ -606,6 +771,29 @@ class _KeypadScreenState extends State<KeypadScreen> {
                 fontWeight: FontWeight.w600,
                 color: textSecondary,
                 letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: isCustom
+                    ? (isDark ? const Color(0xFF064E3B).withOpacity(0.5) : const Color(0xFFDCFCE7))
+                    : chipBg,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'TX: $activeCmd',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 7.5,
+                  fontWeight: FontWeight.bold,
+                  color: isCustom
+                      ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF15803D))
+                      : textSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

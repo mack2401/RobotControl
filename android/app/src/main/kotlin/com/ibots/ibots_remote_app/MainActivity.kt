@@ -609,10 +609,15 @@ class MainActivity: FlutterActivity() {
                             val upper = trimmedCmd.uppercase()
                             val lower = trimmedCmd.lowercase()
 
-                            // Word / Direct candidates
-                            candidates.add(Pair("http://$host:$port/$trimmedCmd", "DIRECT_WORD"))
-                            candidates.add(Pair("http://$host:$port/$lower", "DIRECT_LOWER"))
-                            candidates.add(Pair("http://$host:$port$path$encodedVal", "QUERY_CMD"))
+                            // Support explicit endpoints (e.g. /move?joint=base&angle=90) directly without double slashes
+                            if (trimmedCmd.startsWith("/")) {
+                                candidates.add(Pair("http://$host:$port$trimmedCmd", "EXPLICIT_ENDPOINT"))
+                            } else {
+                                // Word / Direct candidates
+                                candidates.add(Pair("http://$host:$port/$trimmedCmd", "DIRECT_WORD"))
+                                candidates.add(Pair("http://$host:$port/$lower", "DIRECT_LOWER"))
+                                candidates.add(Pair("http://$host:$port$path$encodedVal", "QUERY_CMD"))
+                            }
 
                             when (upper) {
                                 "F", "1", "FORWARD" -> {

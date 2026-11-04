@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../core/models/device_model.dart';
 import '../core/state/robot_state.dart';
 import '../core/sensors/sensor_service.dart';
+import '../core/commands/custom_command_manager.dart';
+import '../widgets/custom_commands_button.dart';
 
 class GyroControlScreen extends StatefulWidget {
   const GyroControlScreen({super.key});
@@ -93,7 +95,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
     if (newDir != activeDirection || (newDir != 'S' && now.difference(_lastHeartbeat).inMilliseconds > 350)) {
       activeDirection = newDir;
       _lastHeartbeat = now;
-      state.sendCarMotionCommand(newDir);
+      state.sendGyroMotionCommand(newDir);
       state.addLog(LogType.cmd, 'GYRO: $newDir (P:${pitch.toInt()}° R:${roll.toInt()}°)');
     }
   }
@@ -103,7 +105,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
     _sensorSub?.cancel();
     _sensorService.stop();
     // Always halt motors when exiting gyro screen
-    state.sendCarMotionCommand("S");
+    state.sendGyroMotionCommand("S");
     super.dispose();
   }
 
@@ -115,7 +117,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
       roll = 0.0;
       activeDirection = 'S';
     });
-    state.sendCarMotionCommand("S");
+    state.sendGyroMotionCommand("S");
     state.addLog(LogType.cmd, 'GYRO: CALIBRATED NEUTRAL ZERO');
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -131,6 +133,189 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
     });
     state.gyroSensitivity = steeringSensitivity;
     state.addLog(LogType.cmd, 'GYRO: SENSITIVITY ${steeringSensitivity.toStringAsFixed(1)}x');
+  }
+
+  void _showGyroCommandConfigDialog() {
+    final motionKeys = ['FORWARD', 'BACKWARD', 'LEFT', 'RIGHT', 'STOP'];
+    final controllers = {
+      for (final k in motionKeys)
+        k: TextEditingController(text: state.commandManager.getGyroCustomOverride(k) ?? '')
+    };
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final activePreset = state.commandManager.gyroPresetModeEnum;
+          return AlertDialog(
+            backgroundColor: cardBg,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.tune, color: Color(0xFF0284C7), size: 20),
+                    const SizedBox(width: 8),
+                    Text('Gyro Commands', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary)),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () {
+                    state.commandManager.resetAllGyroOverrides();
+                    for (final k in motionKeys) {
+                      controllers[k]?.clear();
+                    }
+                    setDialogState(() {});
+                    setState(() {});
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('All custom overrides reset to active preset defaults')),
+                    );
+                  },
+                  child: const Text('Reset All', style: TextStyle(fontSize: 12, color: Color(0xFFEF4444))),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 360,
+              height: 400,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('PRESET MODES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: textSecondary)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: CarPresetMode.values.map((mode) {
+                        final isSelected = activePreset == mode;
+                        final label = mode == CarPresetMode.singleChar
+                            ? 'Single (F/B/L/R/S)'
+                            : mode == CarPresetMode.words
+                                ? 'Words (FORWARD)'
+                                : mode == CarPresetMode.numeric
+                                    ? 'Numeric (1/2/3/4/0)'
+                                    : 'HTTP (/move?dir=...)';
+                        return InkWell(
+                          onTap: () {
+                            state.commandManager.setGyroPresetMode(mode);
+                            setDialogState(() {});
+                            setState(() {});
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? (isDark ? const Color(0xFF1E3A8A) : const Color(0xFFE0F2FE))
+                                  : subBg,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected ? const Color(0xFF0284C7) : cardBorder,
+                                width: isSelected ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isSelected ? const Color(0xFF0284C7) : textSecondary,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    Text('CUSTOM DIRECTION OVERRIDES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: textSecondary)),
+                    const SizedBox(height: 8),
+                    ...motionKeys.map((k) {
+                      final defaultVal = state.commandManager.getGyroDefaultCommand(k);
+                      final activeVal = state.commandManager.getGyroCommand(k);
+                      final isCustom = state.commandManager.isGyroCommandCustomized(k);
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 140,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    k,
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary),
+                                  ),
+                                  Text(
+                                    isCustom
+                                        ? "Default: $defaultVal  •  Custom: $activeVal"
+                                        : "Default: $defaultVal",
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontFamily: 'monospace',
+                                      fontWeight: FontWeight.bold,
+                                      color: isCustom ? const Color(0xFF0284C7) : textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: controllers[k],
+                                style: const TextStyle(fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.w600),
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  hintText: "Default: $defaultVal",
+                                  hintStyle: TextStyle(fontSize: 10, color: textSecondary.withOpacity(0.5)),
+                                  filled: true,
+                                  fillColor: isCustom ? (isDark ? const Color(0xFF064E3B).withOpacity(0.3) : const Color(0xFFF0FDF4)) : subBg,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: cardBorder)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: isCustom ? const Color(0xFF10B981) : cardBorder)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: TextStyle(color: textSecondary)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  for (final k in motionKeys) {
+                    final val = controllers[k]?.text.trim();
+                    state.commandManager.setGyroCommand(k, val != null && val.isNotEmpty ? val : null);
+                  }
+                  setState(() {});
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Gyro motion commands saved successfully!')),
+                  );
+                },
+                child: const Text('Save All'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   String get _sensitivityLabel {
@@ -223,6 +408,13 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textPrimary),
         ),
         actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 4.0),
+            child: CustomCommandsButton(
+              onTap: _showGyroCommandConfigDialog,
+              isCustomized: state.commandManager.hasGyroOverrides,
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 10.0),
             child: InkWell(
@@ -352,7 +544,7 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                           isTransmitting = val;
                           if (!val) {
                             activeDirection = 'S';
-                            state.sendPayload("S\n");
+                            state.sendGyroMotionCommand("S");
                           }
                         });
                       },
@@ -405,14 +597,14 @@ class _GyroControlScreenState extends State<GyroControlScreen> {
                           ),
                           child: Text(
                             activeDirection == 'F'
-                                ? '▲ FWD (F)'
+                                ? '▲ FWD (${state.commandManager.getGyroCommand("FORWARD")})'
                                 : activeDirection == 'B'
-                                    ? '▼ REV (B)'
+                                    ? '▼ REV (${state.commandManager.getGyroCommand("BACKWARD")})'
                                     : activeDirection == 'L'
-                                        ? '◄ LEFT (L)'
+                                        ? '◄ LEFT (${state.commandManager.getGyroCommand("LEFT")})'
                                         : activeDirection == 'R'
-                                            ? '► RIGHT (R)'
-                                            : '● NEUTRAL (S)',
+                                            ? '► RIGHT (${state.commandManager.getGyroCommand("RIGHT")})'
+                                            : '● NEUTRAL (${state.commandManager.getGyroCommand("STOP")})',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,

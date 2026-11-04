@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/models/device_model.dart';
 import '../core/state/robot_state.dart';
+import '../widgets/custom_commands_button.dart';
 
 class GamepadScreen extends StatefulWidget {
   const GamepadScreen({super.key});
@@ -61,6 +62,147 @@ class _GamepadScreenState extends State<GamepadScreen> {
     });
   }
 
+  void _showGamepadCommandConfigDialog() {
+    final cm = state.commandManager;
+    final buttons = ['UP', 'DOWN', 'LEFT', 'RIGHT', 'STOP', 'TRIANGLE', 'CROSS', 'SQUARE', 'CIRCLE', 'START', 'PAUSE'];
+    final controllers = {
+      for (final b in buttons) b: TextEditingController(text: cm.getGamepadCustomOverride(b) ?? ''),
+    };
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Dialog(
+          backgroundColor: cardBg,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            width: 520,
+            constraints: const BoxConstraints(maxHeight: 330),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.sports_esports, color: Color(0xFF0D9488), size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Gamepad: Present & Custom Commands",
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrimary),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close, size: 18, color: textSecondary),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const Divider(height: 14),
+                Expanded(
+                  child: ListView(
+                    children: buttons.map((b) {
+                      final defaultCmd = cm.getGamepadDefaultCommand(b);
+                      final currentCmd = cm.getGamepadCommand(b);
+                      final isCustom = cm.isGamepadCommandCustomized(b);
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 140,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    b,
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textPrimary),
+                                  ),
+                                  Text(
+                                    isCustom
+                                        ? "Default: $defaultCmd  •  Custom: $currentCmd"
+                                        : "Default: $defaultCmd",
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontFamily: 'monospace',
+                                      fontWeight: FontWeight.bold,
+                                      color: isCustom ? const Color(0xFF0D9488) : textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: SizedBox(
+                                height: 36,
+                                child: TextField(
+                                  controller: controllers[b],
+                                  style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: textPrimary),
+                                  decoration: InputDecoration(
+                                    hintText: "Default: $defaultCmd",
+                                    hintStyle: TextStyle(fontSize: 10, color: textSecondary.withOpacity(0.5)),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton.icon(
+                      icon: const Icon(Icons.refresh, size: 14),
+                      label: const Text("Reset All Defaults", style: TextStyle(fontSize: 11)),
+                      onPressed: () {
+                        cm.resetGamepadCommands();
+                        for (final c in controllers.values) {
+                          c.clear();
+                        }
+                        setModalState(() {});
+                        setState(() {});
+                        _showToast("All gamepad commands reset to default");
+                      },
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                      onPressed: () {
+                        for (final b in buttons) {
+                          cm.setGamepadCommand(b, controllers[b]!.text);
+                        }
+                        Navigator.pop(ctx);
+                        setState(() {});
+                        _showToast("Gamepad button commands saved");
+                      },
+                      child: const Text("Save Commands", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _sendCommand(String key, String name) {
     final bool devConnected = isConnected || state.isConnected || state.wifiService.isConnected;
     if (!devConnected) {
@@ -74,31 +216,11 @@ class _GamepadScreenState extends State<GamepadScreen> {
     setState(() {
       activeOutput = key;
     });
-    _showToast('Key: $name');
-    state.addLog(LogType.cmd, 'GAMEPAD: $key ($name)');
-    // Translate gamepad directions to movement chars (U->F/1, D->B/2, L->L/3, R->R/4)
-    String outKey = key;
-    if (state.useNumericMotionCommands) {
-      if (key == 'U' || key == 'F') {
-        outKey = '1';
-      } else if (key == 'D' || key == 'B') {
-        outKey = '2';
-      } else if (key == 'L') {
-        outKey = '3';
-      } else if (key == 'R') {
-        outKey = '4';
-      } else if (key == 'S') {
-        outKey = '0';
-      }
-    } else {
-      if (key == 'U') {
-        outKey = 'F';
-      }
-      if (key == 'D') {
-        outKey = 'B';
-      }
-    }
-    state.sendPayload("$outKey\n");
+
+    final cmd = state.commandManager.getGamepadCommand(name);
+    _showToast('$name -> $cmd');
+    state.addLog(LogType.cmd, 'GAMEPAD: $name ($cmd)');
+    state.sendPayload(cmd.endsWith('\n') ? cmd : "$cmd\n");
   }
 
   void _releaseCommand(String key) {
@@ -108,7 +230,8 @@ class _GamepadScreenState extends State<GamepadScreen> {
       });
       // Send halt on directional release
       if (key == 'U' || key == 'D' || key == 'L' || key == 'R' || key == 'F' || key == 'B' || key == 'J') {
-        state.sendPayload(state.useNumericMotionCommands ? "0\n" : "S\n");
+        final stopCmd = state.commandManager.getGamepadCommand('STOP');
+        state.sendPayload(stopCmd.endsWith('\n') ? stopCmd : "$stopCmd\n");
       }
     }
   }
@@ -387,8 +510,20 @@ class _GamepadScreenState extends State<GamepadScreen> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: cardBorder),
                   ),
-                  child: Icon(Icons.code, size: 15, color: textPrimary),
+                  child: Center(
+                    child: Icon(Icons.code, size: 14, color: textSecondary),
+                  ),
                 ),
+              ),
+            ),
+            // Custom Commands Button
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 4.0),
+              child: CustomCommandsButton(
+                onTap: _showGamepadCommandConfigDialog,
+                compact: true,
+                accentColor: const Color(0xFF0D9488),
+                isCustomized: state.commandManager.hasGamepadOverrides,
               ),
             ),
             const SizedBox(width: 6),
@@ -823,6 +958,9 @@ class _GamepadScreenState extends State<GamepadScreen> {
 
   Widget _buildGlossyButton({required IconData icon, required String keyId, required String name}) {
     final isPressed = activeOutput == keyId;
+    final activeCmd = state.commandManager.getGamepadCommand(name);
+    final isCustom = state.commandManager.isGamepadCommandCustomized(name);
+
     return GestureDetector(
       onTapDown: (_) => _sendCommand(keyId, name),
       onTapUp: (_) => _releaseCommand(keyId),
@@ -852,7 +990,10 @@ class _GamepadScreenState extends State<GamepadScreen> {
                       center: Alignment(-0.3, -0.3),
                       colors: [Colors.white, Colors.white, Color(0xFFF1F5F9)],
                     )),
-          border: Border.all(color: cardBorder, width: 1.5),
+          border: Border.all(
+            color: isCustom ? const Color(0xFF0D9488) : cardBorder,
+            width: isCustom ? 2 : 1.5,
+          ),
           boxShadow: isPressed
               ? [
                   BoxShadow(
@@ -875,10 +1016,26 @@ class _GamepadScreenState extends State<GamepadScreen> {
                 ],
         ),
         child: Center(
-          child: Icon(
-            icon,
-            size: 28,
-            color: isPressed ? const Color(0xFF0D9488) : textPrimary,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 22,
+                color: isPressed ? const Color(0xFF0D9488) : textPrimary,
+              ),
+              Text(
+                activeCmd,
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                  color: isCustom ? const Color(0xFF0D9488) : textSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ),
       ),
@@ -892,6 +1049,9 @@ class _GamepadScreenState extends State<GamepadScreen> {
     required Color color,
   }) {
     final isPressed = activeOutput == keyId;
+    final activeCmd = state.commandManager.getGamepadCommand(name);
+    final isCustom = state.commandManager.isGamepadCommandCustomized(name);
+
     return GestureDetector(
       onTapDown: (_) => _sendCommand(keyId, name),
       onTapUp: (_) => _releaseCommand(keyId),
@@ -921,7 +1081,10 @@ class _GamepadScreenState extends State<GamepadScreen> {
                       center: Alignment(-0.3, -0.3),
                       colors: [Colors.white, Colors.white, Color(0xFFF1F5F9)],
                     )),
-          border: Border.all(color: cardBorder, width: 1.5),
+          border: Border.all(
+            color: isCustom ? const Color(0xFF0D9488) : cardBorder,
+            width: isCustom ? 2 : 1.5,
+          ),
           boxShadow: isPressed
               ? [
                   BoxShadow(
@@ -944,13 +1107,29 @@ class _GamepadScreenState extends State<GamepadScreen> {
                 ],
         ),
         child: Center(
-          child: Text(
-            symbol,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: isPressed ? color : (isDark ? Colors.white : const Color(0xFF1E293B)),
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                symbol,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: isPressed ? color : (isDark ? Colors.white : const Color(0xFF1E293B)),
+                ),
+              ),
+              Text(
+                activeCmd,
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                  color: isCustom ? const Color(0xFF0D9488) : textSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ),
       ),

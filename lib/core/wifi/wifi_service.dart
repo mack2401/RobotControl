@@ -738,9 +738,12 @@ class RealWifiService extends ChangeNotifier {
     if (currentPort == 80) {
       final upper = trimmedCmd.toUpperCase();
       final candidateEndpoints = [
+        if (trimmedCmd.startsWith('/')) trimmedCmd,
         "/cmd?val=${Uri.encodeComponent(trimmedCmd)}",
-        "/$trimmedCmd",
-        "/${trimmedCmd.toLowerCase()}",
+        if (!trimmedCmd.startsWith('/')) ...[
+          "/$trimmedCmd",
+          "/${trimmedCmd.toLowerCase()}",
+        ],
         if (upper == 'F' || upper == '1' || upper == 'FORWARD') ...["/forward", "/FORWARD", "/action?go=forward"],
         if (upper == 'B' || upper == '2' || upper == 'BACKWARD') ...["/backward", "/BACKWARD", "/action?go=backward"],
         if (upper == 'L' || upper == '3' || upper == 'LEFT') ...["/left", "/LEFT", "/action?go=left"],

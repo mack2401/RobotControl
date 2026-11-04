@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/state/robot_state.dart';
 import '../core/models/device_model.dart';
+import '../widgets/custom_commands_button.dart';
 
 class CarControllerScreen extends StatefulWidget {
   const CarControllerScreen({super.key});
@@ -178,6 +179,241 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
     state.sendCarMotionCommand('STOP');
     if (state.danceMode) state.toggleDanceMode();
     if (mounted) setState(() {});
+  }
+
+  void _showCarCommandConfigDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cm = state.commandManager;
+    final fwdCtrl = TextEditingController(text: cm.getCarCustomOverride('FORWARD') ?? '');
+    final bwdCtrl = TextEditingController(text: cm.getCarCustomOverride('BACKWARD') ?? '');
+    final lftCtrl = TextEditingController(text: cm.getCarCustomOverride('LEFT') ?? '');
+    final rgtCtrl = TextEditingController(text: cm.getCarCustomOverride('RIGHT') ?? '');
+    final stpCtrl = TextEditingController(text: cm.getCarCustomOverride('STOP') ?? '');
+    final hrnCtrl = TextEditingController(text: cm.getCarCustomOverride('HORN') ?? '');
+    final lgtCtrl = TextEditingController(text: cm.getCarCustomOverride('LIGHTS_ON') ?? '');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Dialog(
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Container(
+              width: 540,
+              constraints: const BoxConstraints(maxHeight: 330),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.tune, color: Color(0xFF0284C7), size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Car Controller: Present & Custom Commands",
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Presets Row
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildPresetChip("Standard (F/B/L/R/S)", 0, cm.carPresetMode, (m) {
+                          setModalState(() => cm.setCarPresetMode(m));
+                          setState(() {});
+                        }, isDark),
+                        const SizedBox(width: 6),
+                        _buildPresetChip("Words (FORWARD/STOP)", 1, cm.carPresetMode, (m) {
+                          setModalState(() => cm.setCarPresetMode(m));
+                          setState(() {});
+                        }, isDark),
+                        const SizedBox(width: 6),
+                        _buildPresetChip("Numeric (1/2/3/4/0)", 2, cm.carPresetMode, (m) {
+                          setModalState(() => cm.setCarPresetMode(m));
+                          setState(() {});
+                        }, isDark),
+                        const SizedBox(width: 6),
+                        _buildPresetChip("HTTP Endpoints (/forward)", 3, cm.carPresetMode, (m) {
+                          setModalState(() => cm.setCarPresetMode(m));
+                          setState(() {});
+                        }, isDark),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 14),
+                  // Button command inputs
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        _buildCommandInputRow("Forward (▲)", "FORWARD", fwdCtrl, isDark),
+                        _buildCommandInputRow("Backward (▼)", "BACKWARD", bwdCtrl, isDark),
+                        _buildCommandInputRow("Left Turn (◀)", "LEFT", lftCtrl, isDark),
+                        _buildCommandInputRow("Right Turn (▶)", "RIGHT", rgtCtrl, isDark),
+                        _buildCommandInputRow("Stop / Brake (🛑)", "STOP", stpCtrl, isDark),
+                        _buildCommandInputRow("Horn (📢)", "HORN", hrnCtrl, isDark),
+                        _buildCommandInputRow("Lights (💡)", "LIGHTS_ON", lgtCtrl, isDark),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.refresh, size: 14),
+                        label: const Text("Reset All Defaults", style: TextStyle(fontSize: 11)),
+                        onPressed: () {
+                          cm.resetCarCommands();
+                          fwdCtrl.clear();
+                          bwdCtrl.clear();
+                          lftCtrl.clear();
+                          rgtCtrl.clear();
+                          stpCtrl.clear();
+                          hrnCtrl.clear();
+                          lgtCtrl.clear();
+                          setModalState(() {});
+                          setState(() {});
+                          _showToast("All commands reset to default");
+                        },
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0284C7),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        ),
+                        onPressed: () {
+                          cm.setCarCommand("FORWARD", fwdCtrl.text);
+                          cm.setCarCommand("BACKWARD", bwdCtrl.text);
+                          cm.setCarCommand("LEFT", lftCtrl.text);
+                          cm.setCarCommand("RIGHT", rgtCtrl.text);
+                          cm.setCarCommand("STOP", stpCtrl.text);
+                          cm.setCarCommand("HORN", hrnCtrl.text);
+                          cm.setCarCommand("LIGHTS_ON", lgtCtrl.text);
+                          Navigator.pop(ctx);
+                          setState(() {});
+                          _showToast("Custom button commands saved");
+                        },
+                        child: const Text("Save Commands", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPresetChip(String label, int modeIndex, int currentMode, Function(int) onSelect, bool isDark) {
+    final isSelected = currentMode == modeIndex;
+    return InkWell(
+      onTap: () => onSelect(modeIndex),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF0284C7)
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF0284C7) : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? Colors.white : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCommandInputRow(String label, String canonicalKey, TextEditingController controller, bool isDark) {
+    final defaultCmd = state.commandManager.getCarDefaultCommand(canonicalKey);
+    final activeCmd = state.commandManager.getCarCommand(canonicalKey);
+    final isCustom = state.commandManager.isCarCommandCustomized(canonicalKey);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 150,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                Text(
+                  isCustom
+                      ? "Default: $defaultCmd  •  Custom: $activeCmd"
+                      : "Default: $defaultCmd",
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                    color: isCustom ? const Color(0xFF0284C7) : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SizedBox(
+              height: 36,
+              child: TextField(
+                controller: controller,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontFamily: 'monospace',
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+                decoration: InputDecoration(
+                  hintText: "Default: $defaultCmd",
+                  hintStyle: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -419,6 +655,12 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
+                CustomCommandsButton(
+                  onTap: _showCarCommandConfigDialog,
+                  compact: true,
+                  isCustomized: state.commandManager.hasCarOverrides,
+                ),
               ],
             ),
           ),
@@ -548,6 +790,11 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
 
   // --- CENTER POD: COMPACT UTILITIES ---
   Widget _buildCenterPod(bool isDark) {
+    final stopCmd = state.commandManager.getCarCommand('STOP');
+    final hornCmd = state.commandManager.getCarCommand('HORN');
+    final lightCmd = state.commandManager.getCarCommand(state.headlights ? 'LIGHTS_ON' : 'LIGHTS_OFF');
+    final danceCmd = state.commandManager.getCarCommand('DANCE');
+
     return FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.center,
@@ -566,7 +813,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
           child: Container(
             width: double.infinity,
             constraints: const BoxConstraints(maxWidth: 210),
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
             decoration: BoxDecoration(
               color: const Color(0xFFDC2626),
               borderRadius: BorderRadius.circular(12),
@@ -574,18 +821,38 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                 BoxShadow(color: Color(0x33DC2626), blurRadius: 8, offset: Offset(0, 2)),
               ],
             ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.pan_tool, color: Colors.white, size: 16),
-                SizedBox(width: 6),
-                Text(
-                  "STOP",
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                    color: Colors.white,
+                const Row(
+                  children: [
+                    Icon(Icons.pan_tool, color: Colors.white, size: 15),
+                    SizedBox(width: 6),
+                    Text(
+                      "STOP",
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    "CMD: $stopCmd",
+                    style: const TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],
@@ -613,7 +880,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
           child: Container(
             width: double.infinity,
             constraints: const BoxConstraints(maxWidth: 210),
-            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 12),
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
             decoration: BoxDecoration(
               color: _isHornPressed
                   ? (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9))
@@ -629,21 +896,41 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
               ],
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(
-                  Icons.campaign,
-                  size: 17,
-                  color: _isHornPressed ? const Color(0xFFF59E0B) : const Color(0xFF0284C7),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.campaign,
+                      size: 16,
+                      color: _isHornPressed ? const Color(0xFFF59E0B) : const Color(0xFF0284C7),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      "HORN",
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  "HORN",
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.8,
-                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    "CMD: $hornCmd",
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
                   ),
                 ),
               ],
@@ -661,7 +948,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
           child: Container(
             width: double.infinity,
             constraints: const BoxConstraints(maxWidth: 210),
-            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 12),
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(12),
@@ -681,7 +968,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                   children: [
                     Icon(
                       Icons.light_mode,
-                      size: 16,
+                      size: 15,
                       color: state.headlights ? const Color(0xFFF59E0B) : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
                     ),
                     const SizedBox(width: 6),
@@ -699,11 +986,19 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                   ],
                 ),
                 Container(
-                  width: 8,
-                  height: 8,
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                   decoration: BoxDecoration(
-                    color: state.headlights ? const Color(0xFFF59E0B) : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
-                    shape: BoxShape.circle,
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    "CMD: $lightCmd",
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
                   ),
                 ),
               ],
@@ -718,7 +1013,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
           child: Container(
             width: double.infinity,
             constraints: const BoxConstraints(maxWidth: 210),
-            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 12),
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
             decoration: BoxDecoration(
               color: _danceTimer != null
                   ? const Color(0xFF0284C7)
@@ -744,7 +1039,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                   children: [
                     Icon(
                       Icons.smart_toy,
-                      size: 16,
+                      size: 15,
                       color: _danceTimer != null
                           ? Colors.white
                           : (isDark ? const Color(0xFFF59E0B) : const Color(0xFFB45309)),
@@ -763,14 +1058,20 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
                     ),
                   ],
                 ),
-                Text(
-                  _danceTimer != null ? "Active" : "Auto Ready",
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: _danceTimer != null
-                        ? Colors.white
-                        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: _danceTimer != null ? Colors.black26 : (isDark ? const Color(0xFF0F172A) : Colors.white),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    "CMD: $danceCmd",
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      color: _danceTimer != null ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                    ),
                   ),
                 ),
               ],
@@ -790,7 +1091,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
         constraints: const BoxConstraints(maxWidth: 210),
         padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2),
+          color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E8),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: isDark ? const Color(0xFF991B1B) : const Color(0xFFFECACA)),
         ),
@@ -864,7 +1165,7 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
     );
   }
 
-  // --- THUMB BUTTON WITH ROTATED GRAPHIC ---
+  // --- THUMB BUTTON WITH ROTATED GRAPHIC & ACTIVE COMMAND DISPLAY ---
   Widget _buildThumbButton({
     required String cmdCode,
     required bool isActive,
@@ -872,6 +1173,12 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
     required String label,
     required bool isDark,
   }) {
+    final canonicalKey = cmdCode == 'F'
+        ? 'FORWARD'
+        : (cmdCode == 'B' ? 'BACKWARD' : (cmdCode == 'L' ? 'LEFT' : 'RIGHT'));
+    final activeCmd = state.commandManager.getCarCommand(canonicalKey);
+    final isCustom = state.commandManager.isCarCommandCustomized(canonicalKey);
+
     return Listener(
       onPointerDown: (_) => _startCommand(cmdCode),
       onPointerUp: (_) => _stopCommand(cmdCode),
@@ -886,8 +1193,8 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
           border: Border.all(
             color: isActive
                 ? const Color(0xFF0284C7)
-                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-            width: 1,
+                : (isCustom ? const Color(0xFF38BDF8) : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+            width: isCustom ? 1.5 : 1,
           ),
           boxShadow: [
             BoxShadow(
@@ -900,25 +1207,60 @@ class _CarControllerScreenState extends State<CarControllerScreen> {
           ],
         ),
         child: Center(
-          child: RotatedBox(
-            quarterTurns: quarterTurns,
-            child: Image.network(
-              _chevronImageUrl,
-              width: 48,
-              height: 48,
-              fit: BoxFit.contain,
-              color: isActive
-                  ? Colors.white
-                  : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
-              colorBlendMode: BlendMode.srcIn,
-              errorBuilder: (context, error, stackTrace) => Icon(
-                Icons.arrow_forward_rounded,
-                size: 42,
-                color: isActive
-                    ? Colors.white
-                    : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RotatedBox(
+                quarterTurns: quarterTurns,
+                child: Image.network(
+                  _chevronImageUrl,
+                  width: 38,
+                  height: 38,
+                  fit: BoxFit.contain,
+                  color: isActive
+                      ? Colors.white
+                      : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
+                  colorBlendMode: BlendMode.srcIn,
+                  errorBuilder: (context, error, stackTrace) => Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 34,
+                    color: isActive
+                        ? Colors.white
+                        : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 2),
+              // Present Active Command Monospace Pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? Colors.black26
+                      : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isCustom ? const Color(0xFF38BDF8) : Colors.transparent,
+                    width: 0.8,
+                  ),
+                ),
+                child: Text(
+                  "CMD: $activeCmd",
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                    color: isActive
+                        ? Colors.white
+                        : (isCustom
+                            ? const Color(0xFF0284C7)
+                            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ),
       ),

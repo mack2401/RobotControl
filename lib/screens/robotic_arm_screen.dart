@@ -46,10 +46,45 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
   void initState() {
     super.initState();
     _movements = [
-      MovementItem(letter: 'A', title: 'Movement A', subtitle: 'Servo Base / Axis 1', angle: 90, isFixed: true),
-      MovementItem(letter: 'B', title: 'Movement B', subtitle: 'Shoulder / Axis 2', angle: 90, isFixed: true),
-      MovementItem(letter: 'C', title: 'Movement C', subtitle: 'Elbow / Axis 3', angle: 90, isFixed: true),
+      MovementItem(letter: 'A', title: 'Base Rotation', subtitle: '/move?joint=base&angle', angle: 90, isFixed: true),
+      MovementItem(letter: 'B', title: 'Shoulder Axis', subtitle: '/move?joint=shoulder&angle', angle: 90, isFixed: true),
+      MovementItem(letter: 'C', title: 'Elbow Axis', subtitle: '/move?joint=elbow&angle', angle: 90, isFixed: true),
     ];
+  }
+
+  /// Formats the command based on user input in the "Joint / Subtitle" field
+  String _buildCommand(MovementItem item, int angle) {
+    var sub = item.subtitle.trim();
+    if (sub.isEmpty) {
+      return "${item.letter}$angle";
+    }
+    // Single or 2 alphanumeric characters without command chars (e.g. "A" or "S1")
+    if (sub.length <= 2 && RegExp(r'^[a-zA-Z0-9]+$').hasMatch(sub)) {
+      return "$sub$angle";
+    }
+    // Replace explicit placeholders if present (e.g. {angle} or {val})
+    if (sub.contains("{angle}")) {
+      return sub.replaceAll("{angle}", "$angle");
+    }
+    if (sub.contains("{val}")) {
+      return sub.replaceAll("{val}", "$angle");
+    }
+    // Legacy description with spaces and no endpoint characters (e.g. "Servo Base / Axis 1")
+    if (sub.contains(" ") && !sub.startsWith("/") && !sub.contains("?") && !sub.contains("=")) {
+      return "${item.letter}$angle";
+    }
+
+    // Prepend '/' if it has query parameters or path structure without leading slash
+    if (!sub.startsWith("/") && (sub.contains("?") || sub.contains("&") || sub.contains("="))) {
+      sub = "/$sub";
+    }
+
+    // Delimiter handling: append angle cleanly
+    if (sub.endsWith("=") || sub.endsWith("/") || sub.endsWith(":")) {
+      return "$sub$angle";
+    } else {
+      return "$sub=$angle";
+    }
   }
 
   void _resetAllServos() {
@@ -60,7 +95,8 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
     });
     state.resetAllArmServos();
     for (final m in _movements) {
-      state.sendPayload("${m.letter}90\n");
+      final cmd = _buildCommand(m, 90);
+      state.sendPayload(cmd.endsWith('\n') ? cmd : "$cmd\n");
     }
     state.addLog(LogType.cmd, 'ARM: RESET ALL TO 90°');
     ScaffoldMessenger.of(context).showSnackBar(
@@ -80,13 +116,15 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
     if (now.difference(_lastSliderSend).inMilliseconds > 70 && currentAngle != _lastSentAngle) {
       _lastSliderSend = now;
       _lastSentAngle = currentAngle;
-      state.setArmAngle(item.letter, val);
+      final cmd = _buildCommand(item, currentAngle);
+      state.setArmAngle(item.letter, val, customCommand: cmd);
     }
   }
 
   void _onAngleChangeEnd(MovementItem item, double val) {
     _lastSentAngle = val.toInt();
-    state.setArmAngle(item.letter, val);
+    final cmd = _buildCommand(item, val.toInt());
+    state.setArmAngle(item.letter, val, customCommand: cmd);
   }
 
   void _addMovement() {
@@ -102,7 +140,7 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
         MovementItem(
           letter: nextLetter,
           title: 'Movement $nextLetter',
-          subtitle: 'Auxiliary Servo / Joint',
+          subtitle: '/move?joint=joint_${nextLetter.toLowerCase()}&angle',
           angle: 90,
           isFixed: false,
         ),
@@ -128,126 +166,181 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: cardBg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFF0F9FF),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: isDark ? const Color(0xFF38BDF8) : const Color(0xFFBAE6FD)),
-              ),
-              child: Center(
-                child: Text(
-                  item.letter,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final tempItem = MovementItem(
+            letter: item.letter,
+            title: titleController.text,
+            subtitle: subtitleController.text,
+            angle: item.angle,
+          );
+          final previewCmd = _buildCommand(tempItem, item.angle.toInt());
+
+          return AlertDialog(
+            backgroundColor: cardBg,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFF0F9FF),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isDark ? const Color(0xFF38BDF8) : const Color(0xFFBAE6FD)),
+                  ),
+                  child: Center(
+                    child: Text(
+                      item.letter,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                      ),
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
+                Text(
+                  "Edit Movement ${item.letter}",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Movement Name",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textSecondary),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: titleController,
+                    style: TextStyle(color: textPrimary),
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      hintText: "e.g. Base Rotation, Gripper Clamp",
+                      hintStyle: TextStyle(color: textSecondary),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: cardBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF0284C7), width: 1.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    "Joint / Subtitle (Command Format)",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textSecondary),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Enter your endpoint (e.g. /move?joint=base&angle). Angle will be appended automatically.",
+                    style: TextStyle(fontSize: 11, color: textSecondary),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: subtitleController,
+                    style: TextStyle(color: textPrimary, fontFamily: 'monospace', fontSize: 13),
+                    textCapitalization: TextCapitalization.none,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: InputDecoration(
+                      hintText: "e.g. /move?joint=base&angle",
+                      hintStyle: TextStyle(color: textSecondary, fontFamily: 'monospace'),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: cardBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF0284C7), width: 1.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Live Command Preview Box
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: subBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: cardBorder),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.send, size: 11, color: Color(0xFF0284C7)),
+                            const SizedBox(width: 5),
+                            Text(
+                              "LIVE COMMAND PREVIEW",
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: textSecondary),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          previewCmd,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              "Edit Movement ${item.letter}",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Movement Name",
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textSecondary),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: titleController,
-              autofocus: true,
-              style: TextStyle(color: textPrimary),
-              textCapitalization: TextCapitalization.words,
-              decoration: InputDecoration(
-                hintText: "e.g. Base Rotation, Gripper Clamp",
-                hintStyle: TextStyle(color: textSecondary),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cardBorder),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF0284C7), width: 1.5),
-                ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text("Cancel", style: TextStyle(color: textSecondary, fontWeight: FontWeight.w600)),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              "Joint / Subtitle (Optional)",
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textSecondary),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: subtitleController,
-              style: TextStyle(color: textPrimary),
-              textCapitalization: TextCapitalization.words,
-              decoration: InputDecoration(
-                hintText: "e.g. Shoulder / Axis 2",
-                hintStyle: TextStyle(color: textSecondary),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cardBorder),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF0284C7), width: 1.5),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text("Cancel", style: TextStyle(color: textSecondary, fontWeight: FontWeight.w600)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0284C7),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              final newTitle = titleController.text.trim();
-              final newSubtitle = subtitleController.text.trim();
-              if (newTitle.isNotEmpty) {
-                setState(() {
-                  item.title = newTitle;
-                  if (newSubtitle.isNotEmpty) {
-                    item.subtitle = newSubtitle;
+                onPressed: () {
+                  final newTitle = titleController.text.trim();
+                  final newSubtitle = subtitleController.text.trim();
+                  if (newTitle.isNotEmpty) {
+                    setState(() {
+                      item.title = newTitle;
+                      item.subtitle = newSubtitle;
+                    });
+                    state.addLog(LogType.cmd, "ARM: UPDATED AXIS ${item.letter} ('$newTitle' -> '$newSubtitle')");
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Updated Movement ${item.letter}"),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
                   }
-                });
-                state.addLog(LogType.cmd, "ARM: RENAMED AXIS ${item.letter} TO '$newTitle'");
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text("Renamed Movement ${item.letter} to '$newTitle'"),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
+                  Navigator.pop(ctx);
+                },
+                child: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -393,9 +486,25 @@ class _RoboticArmScreenState extends State<RoboticArmScreen> {
                                         ),
                                       ],
                                     ),
-                                    Text(
-                                      item.subtitle,
-                                      style: TextStyle(fontSize: 11, color: textSecondary),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.terminal,
+                                          size: 11,
+                                          color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _buildCommand(item, item.angle.toInt()),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontFamily: 'monospace',
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),

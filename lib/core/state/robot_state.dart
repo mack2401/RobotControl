@@ -4,6 +4,7 @@ import '../models/device_model.dart';
 import '../database/device_database.dart';
 import '../bluetooth/bluetooth_service.dart';
 import '../wifi/wifi_service.dart';
+import '../commands/custom_command_manager.dart';
 
 enum ConnectionStatus { disconnected, connecting, connected }
 
@@ -14,6 +15,7 @@ class RobotState extends ChangeNotifier {
   final DeviceProfileDatabase database = DeviceProfileDatabase();
   final RealBluetoothService bleService = RealBluetoothService();
   final RealWifiService wifiService = RealWifiService();
+  final CustomCommandManager commandManager = CustomCommandManager();
 
   RobotState._internal() {
     _initTerminalLogs();
@@ -98,23 +100,45 @@ class RobotState extends ChangeNotifier {
   /// Unified transport dispatcher: Routes commands to Wi-Fi or Bluetooth automatically
   void sendPayload(String data) {
     final bool isBtActive = bleService.activeType != ActiveConnectionType.none;
-    final bool isBtProtocol = activeProtocol.contains("Bluetooth") ||
-        activeProtocol.contains("BLE") ||
-        activeProtocol.contains("Classic") ||
-        currentDevice.protocol.contains("Bluetooth") ||
-        currentDevice.protocol.contains("Classic");
+    final bool isWifiActive = wifiService.isConnected;
+    final bool isWifiProtocol = activeProtocol.contains("Wi-Fi") ||
+        activeProtocol.contains("WiFi") ||
+        currentDevice.protocol.contains("Wi-Fi") ||
+        currentDevice.protocol.contains("WiFi");
 
-    if (isBtActive || isBtProtocol) {
-      if (!isBtActive) {
-        addTerminalLog("[BT OFFLINE] Command dropped: Not connected to Bluetooth device ($data)", LogType.error);
-        bleService.lastError = "Not connected to Bluetooth device.";
-        return;
-      }
+    // 1. If only Bluetooth hardware link is active -> send via Bluetooth
+    if (isBtActive && !isWifiActive) {
       bleService.sendData(data);
       addTerminalLog("[TX BT] ${data.trim()}", LogType.tx);
-    } else {
+      return;
+    }
+
+    // 2. If only Wi-Fi is active -> send via Wi-Fi
+    if (isWifiActive && !isBtActive) {
       wifiService.sendCommand(data);
       addTerminalLog("[TX Wi-Fi] ${data.trim()}", LogType.tx);
+      return;
+    }
+
+    // 3. If both are active, route based on user's active protocol selection
+    if (isBtActive && isWifiActive) {
+      if (isWifiProtocol) {
+        wifiService.sendCommand(data);
+        addTerminalLog("[TX Wi-Fi] ${data.trim()}", LogType.tx);
+      } else {
+        bleService.sendData(data);
+        addTerminalLog("[TX BT] ${data.trim()}", LogType.tx);
+      }
+      return;
+    }
+
+    // 4. Neither link is confirmed active yet: attempt transmission based on protocol
+    if (isWifiProtocol) {
+      wifiService.sendCommand(data);
+      addTerminalLog("[TX Wi-Fi] ${data.trim()}", LogType.tx);
+    } else {
+      addTerminalLog("[OFFLINE] Cannot transmit: Not connected via Bluetooth or Wi-Fi ($data)", LogType.error);
+      bleService.lastError = "Not connected to any device.";
     }
   }
 
@@ -478,131 +502,115 @@ class RobotState extends ChangeNotifier {
     }
   }
 
-  // 0 = Letters (F/B/L/R/S), 1 = Word (FORWARD/BACKWARD/LEFT/RIGHT/STOP), 2 = Numeric (1/2/3/4/0)
-  int motionProtocolMode = 1; // Default 1: Word protocol (FORWARD, LEFT, etc. for user's new bot)
+  int get motionProtocolMode => commandManager.carPresetMode;
+  set motionProtocolMode(int val) {
+    commandManager.setCarPresetMode(val);
+    notifyListeners();
+  }
 
   bool get useNumericMotionCommands => motionProtocolMode == 2;
   set useNumericMotionCommands(bool val) {
-    motionProtocolMode = val ? 2 : 0;
+    commandManager.setCarPresetMode(val ? 2 : 0);
     notifyListeners();
   }
 
   void toggleMotionCommandProtocol() {
-    motionProtocolMode = (motionProtocolMode + 1) % 3;
-    final name = motionProtocolMode == 1
-        ? 'WORD (FORWARD/LEFT/STOP)'
-        : (motionProtocolMode == 2 ? 'NUMERIC (1/2/3/4/0)' : 'STANDARD (F/B/L/R/S)');
+    final nextMode = (commandManager.carPresetMode + 1) % 4;
+    commandManager.setCarPresetMode(nextMode);
+    final name = commandManager.getCarPresetName(nextMode);
     addTerminalLog(">>> PROTOCOL_SWITCH: $name", LogType.system);
     notifyListeners();
   }
 
   void sendCarMotionCommand(String cmd) {
-    String out = cmd;
     final trimmed = cmd.trim();
-    if (motionProtocolMode == 1) {
-      // WORD PROTOCOL: FORWARD, BACKWARD, LEFT, RIGHT, STOP
-      switch (trimmed) {
-        case 'F':
-        case 'U':
-        case '1':
-        case 'FORWARD':
-          out = 'FORWARD';
-          break;
-        case 'B':
-        case 'D':
-        case '2':
-        case 'BACKWARD':
-          out = 'BACKWARD';
-          break;
-        case 'L':
-        case '3':
-        case 'LEFT':
-          out = 'LEFT';
-          break;
-        case 'R':
-        case '4':
-        case 'RIGHT':
-          out = 'RIGHT';
-          break;
-        case 'S':
-        case '0':
-        case 'STOP':
-          out = 'STOP';
-          break;
-        default:
-          out = cmd;
-      }
-    } else if (motionProtocolMode == 2) {
-      // NUMERIC PROTOCOL: 1, 2, 3, 4, 0
-      switch (trimmed) {
-        case 'F':
-        case 'U':
-        case 'FORWARD':
-          out = '1';
-          break;
-        case 'B':
-        case 'D':
-        case 'BACKWARD':
-          out = '2';
-          break;
-        case 'L':
-        case 'LEFT':
-          out = '3';
-          break;
-        case 'R':
-        case 'RIGHT':
-          out = '4';
-          break;
-        case 'S':
-        case '0':
-        case 'STOP':
-          out = '0';
-          break;
-        default:
-          out = cmd;
-      }
-    } else {
-      // STANDARD LETTERS: F, B, L, R, S
-      switch (trimmed) {
-        case '1':
-        case 'FORWARD':
-          out = 'F';
-          break;
-        case '2':
-        case 'BACKWARD':
-          out = 'B';
-          break;
-        case '3':
-        case 'LEFT':
-          out = 'L';
-          break;
-        case '4':
-        case 'RIGHT':
-          out = 'R';
-          break;
-        case '0':
-        case 'STOP':
-          out = 'S';
-          break;
-        default:
-          out = cmd;
-      }
+    String? canonical;
+    switch (trimmed.toUpperCase()) {
+      case 'F':
+      case 'U':
+      case '1':
+      case 'FORWARD':
+        canonical = 'FORWARD';
+        break;
+      case 'B':
+      case 'D':
+      case '2':
+      case 'BACKWARD':
+        canonical = 'BACKWARD';
+        break;
+      case 'L':
+      case '3':
+      case 'LEFT':
+        canonical = 'LEFT';
+        break;
+      case 'R':
+      case '4':
+      case 'RIGHT':
+        canonical = 'RIGHT';
+        break;
+      case 'S':
+      case '0':
+      case 'STOP':
+        canonical = 'STOP';
+        break;
     }
+
+    final out = canonical != null ? commandManager.getCarCommand(canonical) : cmd;
+    sendPayload(out.endsWith('\n') ? out : "$out\n");
+  }
+
+  void sendGyroMotionCommand(String cmd) {
+    String? canonical;
+    switch (cmd.toUpperCase()) {
+      case 'F':
+      case '1':
+      case 'FORWARD':
+        canonical = 'FORWARD';
+        break;
+      case 'B':
+      case '2':
+      case 'BACKWARD':
+        canonical = 'BACKWARD';
+        break;
+      case 'L':
+      case '3':
+      case 'LEFT':
+        canonical = 'LEFT';
+        break;
+      case 'R':
+      case '4':
+      case 'RIGHT':
+        canonical = 'RIGHT';
+        break;
+      case 'S':
+      case '0':
+      case 'STOP':
+        canonical = 'STOP';
+        break;
+    }
+
+    final out = canonical != null ? commandManager.getGyroCommand(canonical) : cmd;
     sendPayload(out.endsWith('\n') ? out : "$out\n");
   }
 
   void toggleHeadlights() {
     headlights = !headlights;
     relays[0] = headlights; // sync with switch panel Ch 1
-    sendPayload(headlights ? "1\n" : "0\n");
-    addTerminalLog(">>> SET_LIGHT=${headlights ? 1 : 0}", LogType.tx);
+    final cmd = headlights ? commandManager.getCarCommand('LIGHTS_ON') : commandManager.getCarCommand('LIGHTS_OFF');
+    sendPayload(cmd.endsWith('\n') ? cmd : "$cmd\n");
+    addTerminalLog(">>> SET_LIGHT=$cmd", LogType.tx);
     notifyListeners();
   }
 
   void setHorn(bool active) {
     hornActive = active;
     relays[3] = active; // sync with Buzzer Ch 4
-    sendPayload(active ? "H" : "h");
+    if (active) {
+      final cmd = commandManager.getCarCommand('HORN');
+      sendPayload(cmd.endsWith('\n') ? cmd : "$cmd\n");
+    } else {
+      sendPayload("h\n");
+    }
     addTerminalLog(">>> HORN=${active ? 1 : 0}", LogType.tx);
     notifyListeners();
   }
@@ -812,9 +820,13 @@ class RobotState extends ChangeNotifier {
     'F': 55.0,  // Gripper Claw Axis 6
   };
 
-  void setArmAngle(String axis, double angle) {
+  void setArmAngle(String axis, double angle, {String? customCommand}) {
     armAngles[axis] = angle;
-    sendPayload("$axis${angle.toInt()}\n");
+    final payload = (customCommand != null && customCommand.trim().isNotEmpty)
+        ? customCommand.trim()
+        : "$axis${angle.toInt()}";
+    sendPayload(payload.endsWith('\n') ? payload : "$payload\n");
+    addTerminalLog(">>> ARM: $payload", LogType.tx);
     notifyListeners();
   }
 
@@ -917,48 +929,56 @@ class RobotState extends ChangeNotifier {
       throttle = 1.0;
       steering = 0.0;
       motionStatusText = "FORWARD • 100%";
-      btCmd = "F";
-      executedAction = "Move Forward (F)";
+      final cmd = commandManager.getCarCommand('FORWARD');
+      btCmd = cmd;
+      executedAction = "Move Forward ($cmd)";
     } else if (text.contains("backward") || text.contains("back") || text.contains("reverse")) {
       throttle = -1.0;
       steering = 0.0;
       motionStatusText = "REVERSE • 100%";
-      btCmd = "B";
-      executedAction = "Reverse (B)";
+      final cmd = commandManager.getCarCommand('BACKWARD');
+      btCmd = cmd;
+      executedAction = "Reverse ($cmd)";
     } else if (text.contains("left")) {
       throttle = 0.0;
       steering = -1.0;
       motionStatusText = "LEFT TURN";
-      btCmd = "L";
-      executedAction = "Turn Left (L)";
+      final cmd = commandManager.getCarCommand('LEFT');
+      btCmd = cmd;
+      executedAction = "Turn Left ($cmd)";
     } else if (text.contains("right")) {
       throttle = 0.0;
       steering = 1.0;
       motionStatusText = "RIGHT TURN";
-      btCmd = "R";
-      executedAction = "Turn Right (R)";
+      final cmd = commandManager.getCarCommand('RIGHT');
+      btCmd = cmd;
+      executedAction = "Turn Right ($cmd)";
     } else if (text.contains("stop") || text.contains("halt") || text.contains("freeze") || text.contains("brake") || text.contains("pause")) {
       throttle = 0.0;
       steering = 0.0;
       danceMode = false;
       motionStatusText = "IDLE • STANDBY";
-      btCmd = "S";
-      executedAction = "Full Stop (S)";
+      final cmd = commandManager.getCarCommand('STOP');
+      btCmd = cmd;
+      executedAction = "Full Stop ($cmd)";
     } else if (text.contains("light on") || text.contains("lights on") || text.contains("headlight on") || text.contains("turn on light") || text.contains("turn on the light") || text.contains("turn on lights") || text.contains("turn on the lights")) {
       headlights = true;
       relays[0] = true;
-      btCmd = "1";
-      executedAction = "Lights ON (1)";
+      final cmd = commandManager.getCarCommand('LIGHTS_ON');
+      btCmd = cmd;
+      executedAction = "Lights ON ($cmd)";
     } else if (text.contains("light off") || text.contains("lights off") || text.contains("headlight off") || text.contains("turn off light") || text.contains("turn off the light") || text.contains("turn off lights") || text.contains("turn off the lights")) {
       headlights = false;
       relays[0] = false;
-      btCmd = "0";
-      executedAction = "Lights OFF (0)";
+      final cmd = commandManager.getCarCommand('LIGHTS_OFF');
+      btCmd = cmd;
+      executedAction = "Lights OFF ($cmd)";
     } else if (text.contains("horn") || text.contains("beep") || text.contains("honk")) {
       hornActive = true;
       relays[3] = true;
-      btCmd = "H";
-      executedAction = "Horn Sounding (H)";
+      final cmd = commandManager.getCarCommand('HORN');
+      btCmd = cmd;
+      executedAction = "Horn Sounding ($cmd)";
       Future.delayed(const Duration(milliseconds: 1500), () {
         hornActive = false;
         relays[3] = false;
@@ -968,8 +988,9 @@ class RobotState extends ChangeNotifier {
     } else if (text.contains("dance") || text.contains("party") || text.contains("celebrate")) {
       danceMode = true;
       motionStatusText = "DANCE CHOREOGRAPHY ACTIVE";
-      btCmd = "X";
-      executedAction = "Dance Mode (X)";
+      final cmd = commandManager.getCarCommand('DANCE');
+      btCmd = cmd;
+      executedAction = "Dance Mode ($cmd)";
     } else if (text.contains("faster") || text.contains("fast") || text.contains("full speed") || text.contains("high speed")) {
       setSpeedCap(100.0);
       executedAction = "Speed 100%";
