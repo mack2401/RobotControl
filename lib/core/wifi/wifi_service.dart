@@ -79,6 +79,11 @@ class RealWifiNetwork {
     return lower.contains("esp32") ||
         lower.contains("esp8266") ||
         lower.contains("esp") ||
+        lower.contains("litewing") ||
+        lower.contains("drone") ||
+        lower.contains("wing") ||
+        lower.contains("quad") ||
+        lower.contains("flight") ||
         lower.contains("ibots") ||
         lower.contains("robot") ||
         lower.contains("rover") ||
@@ -131,7 +136,15 @@ class ConnectedWifiInfo {
   });
 
   bool get is5Ghz => frequency >= 4900;
-  bool get isEspHotspot => ip.startsWith("192.168.4.") || gateway == "192.168.4.1" || ssid.toLowerCase().contains("esp");
+  bool get isEspHotspot =>
+      ip.startsWith("192.168.4.") ||
+      ip.startsWith("192.168.43.") ||
+      gateway == "192.168.4.1" ||
+      gateway == "192.168.43.1" ||
+      gateway == "192.168.43.42" ||
+      ssid.toLowerCase().contains("esp") ||
+      ssid.toLowerCase().contains("litewing") ||
+      ssid.toLowerCase().contains("drone");
 }
 
 class RealWifiService extends ChangeNotifier {

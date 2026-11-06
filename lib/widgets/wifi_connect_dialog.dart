@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/state/robot_state.dart';
 import '../core/wifi/wifi_service.dart';
+import '../core/drone/litewing_service.dart';
 
 class WifiConnectDialog {
   static Future<bool> show(BuildContext context, RealWifiNetwork net, {VoidCallback? onSuccess}) async {
@@ -303,13 +304,24 @@ class WifiConnectDialog {
                 onPressed: isConnecting
                     ? null
                     : () async {
+                        final isDrone = net.ssid.toLowerCase().contains("litewing") ||
+                            net.ssid.toLowerCase().contains("drone");
+                        const droneIp = "192.168.43.42";
+
                         if (isAlreadyConnected) {
                           setDialogState(() {
                             isConnecting = true;
-                            statusMessage = "Linking to ESP robot at 192.168.4.1...";
+                            statusMessage = isDrone
+                                ? "Linking to LiteWing Drone at $droneIp:2390..."
+                                : "Linking to ESP robot at 192.168.4.1...";
                           });
                           await state.wifiService.bindProcessToWifi();
-                          final ok = await state.connectWifi(host: "192.168.4.1", mode: WifiMode.softAp, name: net.ssid);
+                          final bool ok;
+                          if (isDrone) {
+                            ok = await LiteWingService().connectDrone(host: droneIp, port: 2390);
+                          } else {
+                            ok = await state.connectWifi(host: "192.168.4.1", mode: WifiMode.softAp, name: net.ssid);
+                          }
                           if (ctx.mounted) Navigator.of(ctx).pop(ok);
                           if (ok && onSuccess != null) onSuccess();
                           return;
@@ -337,17 +349,29 @@ class WifiConnectDialog {
 
                         if (success) {
                           setDialogState(() {
-                            statusMessage = "Wi-Fi linked! Connecting to ESP robot controller...";
+                            statusMessage = isDrone
+                                ? "Wi-Fi linked! Connecting to LiteWing Drone ($droneIp:2390)..."
+                                : "Wi-Fi linked! Connecting to ESP robot controller...";
                           });
                           await state.wifiService.bindProcessToWifi();
-                          final ok = await state.connectWifi(host: "192.168.4.1", mode: WifiMode.softAp, name: net.ssid);
+                          final bool ok;
+                          if (isDrone) {
+                            ok = await LiteWingService().connectDrone(host: droneIp, port: 2390);
+                          } else {
+                            ok = await state.connectWifi(host: "192.168.4.1", mode: WifiMode.softAp, name: net.ssid);
+                          }
                           if (ctx.mounted) Navigator.of(ctx).pop(ok);
                           if (ok && onSuccess != null) onSuccess();
                         } else {
                           // Try binding anyway in case user connected manually in background
                           await state.wifiService.refreshConnectedWifi();
                           if (state.wifiService.currentPhoneWifi?.ssid.toLowerCase() == net.ssid.toLowerCase()) {
-                            final ok = await state.connectWifi(host: "192.168.4.1", mode: WifiMode.softAp, name: net.ssid);
+                            final bool ok;
+                            if (isDrone) {
+                              ok = await LiteWingService().connectDrone(host: droneIp, port: 2390);
+                            } else {
+                              ok = await state.connectWifi(host: "192.168.4.1", mode: WifiMode.softAp, name: net.ssid);
+                            }
                             if (ctx.mounted) Navigator.of(ctx).pop(ok);
                             if (ok && onSuccess != null) onSuccess();
                           } else {

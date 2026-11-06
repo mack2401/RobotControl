@@ -14,28 +14,33 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
   final RobotState state = RobotState();
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
-  Color get scaffoldBg => isDark ? const Color(0xFF0B0F17) : const Color(0xFFFAF9FA);
-  Color get appBarBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFFAF9FA);
+  Color get scaffoldBg =>
+      isDark ? const Color(0xFF0B0F17) : const Color(0xFFFAF9FA);
+  Color get appBarBg =>
+      isDark ? const Color(0xFF0F172A) : const Color(0xFFFAF9FA);
   Color get cardBg => isDark ? const Color(0xFF1E293B) : Colors.white;
-  Color get cardBorder => isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+  Color get cardBorder =>
+      isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
   Color get textPrimary => isDark ? Colors.white : const Color(0xFF1B1C1D);
-  Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF5A5F63);
+  Color get textSecondary =>
+      isDark ? const Color(0xFF94A3B8) : const Color(0xFF5A5F63);
   Color get subBg => isDark ? const Color(0xFF0F172A) : const Color(0xFFFAF9FA);
-  Color get chipBg => isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+  Color get chipBg =>
+      isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
 
   // 10 Customizable switch names
   late List<String> switchNames;
 
-  // 10 Switches with exact stitch defaults (1, 3, 6, 8 ON)
+  // 10 Switches
   final List<bool> switchStates = [
-    true,  // 1
+    false, // 1
     false, // 2
-    true,  // 3
+    false, // 3
     false, // 4
     false, // 5
-    true,  // 6
+    false, // 6
     false, // 7
-    true,  // 8
+    false, // 8
     false, // 9
     false, // 10
   ];
@@ -57,13 +62,16 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
         : state.commandManager.getSwitchOffCommand(index);
     state.addLog(LogType.cmd, '$sName: $sVal ($cmd)');
     state.sendPayload(cmd.endsWith('\n') ? cmd : "$cmd\n");
-    state.addTerminalLog(">>> SWITCH $sName -> $sVal (CMD: '$cmd')", LogType.tx);
+    state.addTerminalLog(
+        ">>> SWITCH $sName -> $sVal (CMD: '$cmd')", LogType.tx);
   }
 
   void _editSwitchConfig(int index) {
     final nameCtrl = TextEditingController(text: switchNames[index]);
-    final onCtrl = TextEditingController(text: state.commandManager.getSwitchOnCustomOverride(index) ?? '');
-    final offCtrl = TextEditingController(text: state.commandManager.getSwitchOffCustomOverride(index) ?? '');
+    final onCtrl = TextEditingController(
+        text: state.commandManager.getSwitchOnCustomOverride(index) ?? '');
+    final offCtrl = TextEditingController(
+        text: state.commandManager.getSwitchOffCustomOverride(index) ?? '');
     final defaultOn = state.commandManager.getSwitchOnDefault(index);
     final defaultOff = state.commandManager.getSwitchOffDefault(index);
     final currentOn = state.commandManager.getSwitchOnCommand(index);
@@ -84,7 +92,10 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
             Expanded(
               child: Text(
                 "Configure Switch ${index + 1}",
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textPrimary),
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: textPrimary),
               ),
             ),
           ],
@@ -94,47 +105,71 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Switch Label", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textSecondary)),
+              Text("Switch Label",
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: textSecondary)),
               const SizedBox(height: 4),
               TextField(
                 controller: nameCtrl,
                 style: TextStyle(fontSize: 12, color: textPrimary),
                 decoration: InputDecoration(
                   hintText: "Switch ${index + 1}",
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                isCustomOn ? "ON Command (Default: $defaultOn • Custom: $currentOn)" : "ON Command (Default: $defaultOn)",
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textSecondary),
+                isCustomOn
+                    ? "ON Command (Default: $defaultOn • Custom: $currentOn)"
+                    : "ON Command (Default: $defaultOn)",
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: textSecondary),
               ),
               const SizedBox(height: 4),
               TextField(
                 controller: onCtrl,
-                style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: textPrimary),
+                style: TextStyle(
+                    fontSize: 12, fontFamily: 'monospace', color: textPrimary),
                 decoration: InputDecoration(
                   hintText: "Default: $defaultOn",
-                  hintStyle: TextStyle(fontSize: 10, color: textSecondary.withOpacity(0.5)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  hintStyle: TextStyle(
+                      fontSize: 10, color: textSecondary.withOpacity(0.5)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                isCustomOff ? "OFF Command (Default: $defaultOff • Custom: $currentOff)" : "OFF Command (Default: $defaultOff)",
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textSecondary),
+                isCustomOff
+                    ? "OFF Command (Default: $defaultOff • Custom: $currentOff)"
+                    : "OFF Command (Default: $defaultOff)",
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: textSecondary),
               ),
               const SizedBox(height: 4),
               TextField(
                 controller: offCtrl,
-                style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: textPrimary),
+                style: TextStyle(
+                    fontSize: 12, fontFamily: 'monospace', color: textPrimary),
                 decoration: InputDecoration(
                   hintText: "Default: $defaultOff",
-                  hintStyle: TextStyle(fontSize: 10, color: textSecondary.withOpacity(0.5)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  hintStyle: TextStyle(
+                      fontSize: 10, color: textSecondary.withOpacity(0.5)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
               ),
             ],
@@ -149,11 +184,13 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                 setState(() {});
                 _showToast("Switch ${index + 1} reset to default commands");
               },
-              child: const Text("Reset Commands", style: TextStyle(color: Colors.red, fontSize: 11)),
+              child: const Text("Reset Commands",
+                  style: TextStyle(color: Colors.red, fontSize: 11)),
             ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text("Cancel", style: TextStyle(color: textSecondary, fontSize: 11)),
+            child: Text("Cancel",
+                style: TextStyle(color: textSecondary, fontSize: 11)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -172,7 +209,8 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
               setState(() {});
               _showToast("Switch ${index + 1} settings saved");
             },
-            child: const Text("Save", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            child: const Text("Save",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -186,7 +224,8 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) => Dialog(
           backgroundColor: cardBg,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Container(
             width: 520,
             constraints: const BoxConstraints(maxHeight: 360),
@@ -200,11 +239,15 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.toggle_on, color: Color(0xFF0284C7), size: 18),
+                        const Icon(Icons.toggle_on,
+                            color: Color(0xFF0284C7), size: 18),
                         const SizedBox(width: 8),
                         Text(
                           "Switch Panel: Present & Custom Commands",
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrimary),
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: textPrimary),
                         ),
                       ],
                     ),
@@ -229,12 +272,14 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
 
                       return Container(
                         margin: const EdgeInsets.symmetric(vertical: 3),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: subBg,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: isCustom ? const Color(0xFF0284C7) : cardBorder,
+                            color:
+                                isCustom ? const Color(0xFF0284C7) : cardBorder,
                           ),
                         ),
                         child: Row(
@@ -245,7 +290,10 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                               children: [
                                 Text(
                                   switchNames[i],
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textPrimary),
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: textPrimary),
                                 ),
                                 Text(
                                   isCustom
@@ -255,21 +303,27 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                                     fontSize: 9.5,
                                     fontFamily: 'monospace',
                                     fontWeight: FontWeight.bold,
-                                    color: isCustom ? const Color(0xFF0284C7) : textSecondary,
+                                    color: isCustom
+                                        ? const Color(0xFF0284C7)
+                                        : textSecondary,
                                   ),
                                 ),
                               ],
                             ),
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isCustom ? const Color(0xFF0284C7) : chipBg,
-                                foregroundColor: isCustom ? Colors.white : textPrimary,
+                                backgroundColor:
+                                    isCustom ? const Color(0xFF0284C7) : chipBg,
+                                foregroundColor:
+                                    isCustom ? Colors.white : textPrimary,
                                 elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 minimumSize: Size.zero,
                               ),
                               icon: const Icon(Icons.edit, size: 11),
-                              label: const Text("Edit", style: TextStyle(fontSize: 10)),
+                              label: const Text("Edit",
+                                  style: TextStyle(fontSize: 10)),
                               onPressed: () {
                                 Navigator.pop(ctx);
                                 _editSwitchConfig(i);
@@ -287,7 +341,8 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                   children: [
                     TextButton.icon(
                       icon: const Icon(Icons.refresh, size: 14),
-                      label: const Text("Reset All to Defaults", style: TextStyle(fontSize: 11)),
+                      label: const Text("Reset All to Defaults",
+                          style: TextStyle(fontSize: 11)),
                       onPressed: () {
                         cm.resetSwitchCommands();
                         setModalState(() {});
@@ -299,10 +354,13 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0284C7),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                       ),
                       onPressed: () => Navigator.pop(ctx),
-                      child: const Text("Done", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: const Text("Done",
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -329,7 +387,8 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
         backgroundColor: appBarBg.withOpacity(0.95),
         actions: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 8.0),
+            padding:
+                const EdgeInsets.symmetric(vertical: 10.0, horizontal: 8.0),
             child: CustomCommandsButton(
               onTap: _showAllSwitchesConfigDialog,
               accentColor: const Color(0xFF0D9488),
@@ -361,7 +420,8 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
         ),
         title: Text(
           'Switch Panel',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+          style: TextStyle(
+              fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
         ),
       ),
       body: SafeArea(
@@ -396,22 +456,29 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                   final isChecked = switchStates[index];
                   final name = switchNames[index];
                   final onCmd = state.commandManager.getSwitchOnCommand(index);
-                  final offCmd = state.commandManager.getSwitchOffCommand(index);
-                  final isCustom = state.commandManager.isSwitchCustomized(index);
+                  final offCmd =
+                      state.commandManager.getSwitchOffCommand(index);
+                  final isCustom =
+                      state.commandManager.isSwitchCustomized(index);
 
                   return InkWell(
                     onTap: () => _toggleSwitch(index),
                     onLongPress: () => _editSwitchConfig(index),
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
                         color: cardBg,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isChecked
-                              ? (isDark ? const Color(0xFF0D9488) : const Color(0xFF99F6E4))
-                              : (isCustom ? const Color(0xFF0284C7) : cardBorder),
+                              ? (isDark
+                                  ? const Color(0xFF0D9488)
+                                  : const Color(0xFF99F6E4))
+                              : (isCustom
+                                  ? const Color(0xFF0284C7)
+                                  : cardBorder),
                           width: isChecked || isCustom ? 1.5 : 1,
                         ),
                         boxShadow: [
@@ -446,19 +513,24 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: isChecked ? const Color(0xFF14B8A6) : textSecondary,
+                                  color: isChecked
+                                      ? const Color(0xFF14B8A6)
+                                      : textSecondary,
                                 ),
                               ),
                             ],
                           ),
                           // Present Command Badge
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: subBg,
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: isCustom ? const Color(0xFF0284C7) : cardBorder,
+                                color: isCustom
+                                    ? const Color(0xFF0284C7)
+                                    : cardBorder,
                                 width: 0.8,
                               ),
                             ),
@@ -470,7 +542,9 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                                 fontWeight: FontWeight.bold,
                                 color: isChecked
                                     ? const Color(0xFF14B8A6)
-                                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                    : (isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF64748B)),
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -487,11 +561,15 @@ class _SwitchPanelScreenState extends State<SwitchPanelScreen> {
                                   borderRadius: BorderRadius.circular(999),
                                   color: isChecked
                                       ? const Color(0xFF0D9488)
-                                      : (isDark ? const Color(0xFF334155) : const Color(0xFFE3E2E3)),
+                                      : (isDark
+                                          ? const Color(0xFF334155)
+                                          : const Color(0xFFE3E2E3)),
                                 ),
                                 child: AnimatedAlign(
                                   duration: const Duration(milliseconds: 200),
-                                  alignment: isChecked ? Alignment.centerRight : Alignment.centerLeft,
+                                  alignment: isChecked
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
                                   child: Container(
                                     width: 20,
                                     height: 20,

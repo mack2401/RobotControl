@@ -22,6 +22,11 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
 import androidx.annotation.NonNull
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -32,6 +37,10 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.ibots.ibots_remote_app/wifi"
     private val SENSOR_CHANNEL = "com.ibots.ibots_remote_app/sensors"
+    private val BT_CHANNEL = "com.ibots.ibots_remote_app/bluetooth"
+    private var btChannel: MethodChannel? = null
+    private var btReceiver: BroadcastReceiver? = null
+    private var isBtReceiverRegistered = false
     private val PERMISSION_REQUEST_CODE = 4412
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var activeNetworkCallback: ConnectivityManager.NetworkCallback? = null
@@ -237,11 +246,233 @@ class MainActivity: FlutterActivity() {
     override fun onDestroy() {
         stopSensors()
         closeTcp()
+        stopBtDiscovery()
+        unregisterBtDisconnectReceiver()
         super.onDestroy()
+    }
+
+    private var btDisconnectReceiver: BroadcastReceiver? = null
+
+    private fun registerBtDisconnectReceiver() {
+        if (btDisconnectReceiver != null) return
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent == null) return
+                when (intent.action) {
+                    BluetoothDevice.ACTION_ACL_DISCONNECTED,
+                    BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED -> {
+                        val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                        }
+                        val address = device?.address ?: ""
+                        android.util.Log.i("MainActivity", "Bluetooth ACL disconnected: $address")
+                        runOnUiThread {
+                            btChannel?.invokeMethod("onDeviceDisconnected", mapOf("address" to address))
+                        }
+                    }
+                    BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                        val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                        if (state == BluetoothAdapter.STATE_OFF || state == BluetoothAdapter.STATE_TURNING_OFF) {
+                            android.util.Log.i("MainActivity", "Bluetooth adapter turned off")
+                            runOnUiThread {
+                                btChannel?.invokeMethod("onDeviceDisconnected", mapOf("address" to ""))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED)
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+        }
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                registerReceiver(receiver, filter)
+            }
+            btDisconnectReceiver = receiver
+            android.util.Log.i("MainActivity", "Registered btDisconnectReceiver successfully")
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to register btDisconnectReceiver: ${e.message}")
+        }
+    }
+
+    private fun unregisterBtDisconnectReceiver() {
+        if (btDisconnectReceiver != null) {
+            try {
+                unregisterReceiver(btDisconnectReceiver)
+            } catch (_: Exception) {}
+            btDisconnectReceiver = null
+        }
+    }
+
+    private fun getBluetoothAdapter(): BluetoothAdapter? {
+        val bm = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        return bm?.adapter ?: BluetoothAdapter.getDefaultAdapter()
+    }
+
+    private fun startBtDiscovery(result: MethodChannel.Result) {
+        val adapter = getBluetoothAdapter()
+        if (adapter == null) {
+            result.error("NO_BT", "Bluetooth adapter not found", null)
+            return
+        }
+        if (!adapter.isEnabled) {
+            result.error("BT_DISABLED", "Bluetooth is disabled", null)
+            return
+        }
+
+        stopBtDiscovery()
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent == null) return
+                when (intent.action) {
+                    BluetoothDevice.ACTION_FOUND,
+                    BluetoothDevice.ACTION_NAME_CHANGED -> {
+                        val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                        }
+                        if (device != null) {
+                            val name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME) ?: device.name ?: ""
+                            val rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, (-60).toShort()).toInt()
+                            val address = device.address ?: ""
+                            val bondState = device.bondState
+
+                            runOnUiThread {
+                                btChannel?.invokeMethod("onDeviceFound", mapOf(
+                                    "address" to address,
+                                    "name" to name,
+                                    "rssi" to rssi,
+                                    "bondState" to bondState
+                                ))
+                            }
+                        }
+                    }
+                    BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
+                        val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                        }
+                        if (device != null) {
+                            val state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE)
+                            runOnUiThread {
+                                btChannel?.invokeMethod("onBondStateChanged", mapOf(
+                                    "address" to (device.address ?: ""),
+                                    "state" to state
+                                ))
+                            }
+                        }
+                    }
+                    BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
+                        runOnUiThread {
+                            btChannel?.invokeMethod("onDiscoveryFinished", null)
+                        }
+                    }
+                }
+            }
+        }
+
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothDevice.ACTION_NAME_CHANGED)
+            addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+        }
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                registerReceiver(receiver, filter)
+            }
+            btReceiver = receiver
+            isBtReceiverRegistered = true
+            if (adapter.isDiscovering) {
+                adapter.cancelDiscovery()
+            }
+            val started = adapter.startDiscovery()
+            android.util.Log.i("MainActivity", "Bluetooth adapter.startDiscovery() started: $started")
+            result.success(started)
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "startBtDiscovery error: ${e.message}")
+            result.error("DISCOVERY_FAILED", e.message, null)
+        }
+    }
+
+    private fun stopBtDiscovery() {
+        try {
+            val adapter = getBluetoothAdapter()
+            adapter?.cancelDiscovery()
+        } catch (_: Exception) {}
+
+        if (isBtReceiverRegistered && btReceiver != null) {
+            try {
+                unregisterReceiver(btReceiver)
+            } catch (_: Exception) {}
+            isBtReceiverRegistered = false
+            btReceiver = null
+        }
+    }
+
+    private fun pairBtDevice(address: String, result: MethodChannel.Result) {
+        val adapter = getBluetoothAdapter()
+        if (adapter == null) {
+            result.error("NO_BT", "Bluetooth adapter not found", null)
+            return
+        }
+        try {
+            val device = adapter.getRemoteDevice(address)
+            if (device.bondState == BluetoothDevice.BOND_BONDED) {
+                result.success(true)
+                return
+            }
+            val ok = device.createBond()
+            result.success(ok)
+        } catch (e: Exception) {
+            result.error("PAIR_FAILED", e.message, null)
+        }
     }
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        val bChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BT_CHANNEL)
+        btChannel = bChannel
+        registerBtDisconnectReceiver()
+        bChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startDiscovery" -> startBtDiscovery(result)
+                "stopDiscovery" -> {
+                    stopBtDiscovery()
+                    result.success(true)
+                }
+                "pairDevice" -> {
+                    val address = call.argument<String>("address") ?: ""
+                    pairBtDevice(address, result)
+                }
+                "getBondState" -> {
+                    val address = call.argument<String>("address") ?: ""
+                    val adapter = getBluetoothAdapter()
+                    val dev = adapter?.getRemoteDevice(address)
+                    result.success(dev?.bondState ?: BluetoothDevice.BOND_NONE)
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         val sChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SENSOR_CHANNEL)
         sensorChannel = sChannel

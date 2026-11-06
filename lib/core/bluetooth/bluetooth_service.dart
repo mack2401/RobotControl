@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:bluetooth_classic/bluetooth_classic.dart';
 import 'package:bluetooth_classic/models/device.dart' as bc;
@@ -20,6 +21,7 @@ class RealBluetoothService extends ChangeNotifier {
 
   // Dual-mode Bluetooth engines
   final BluetoothClassic _classic = BluetoothClassic();
+  static const MethodChannel _btChannel = MethodChannel('com.ibots.ibots_remote_app/bluetooth');
 
   // --- Real Bluetooth State ---
   BluetoothAdapterState adapterState = BluetoothAdapterState.unknown;
@@ -64,35 +66,191 @@ class RealBluetoothService extends ChangeNotifier {
         notifyListeners();
       });
 
-      // Bluetooth Classic status listener: 0 = disconnected, 1 = connecting, 2 = connected
-      _classicStatusSub = _classic.onDeviceStatusChanged().listen((status) {
-        debugPrint("[Classic Service] onDeviceStatusChanged: status=$status (0=disc, 1=conn-ing, 2=conn-ed)");
-        if (status == bc.Device.connected) {
-          // Status 2: Hardware RFCOMM socket established
-          if (activeType != ActiveConnectionType.classicSpp) {
-            activeType = ActiveConnectionType.classicSpp;
-            notifyListeners();
+      // Persistent BLE Scan Results Listener (Runs once on launch for Android & iOS)
+      _scanSub = FlutterBluePlus.scanResults.listen((results) {
+        for (var res in results) {
+          final dev = res.device;
+          final mac = dev.remoteId.str;
+          final macUpper = mac.toUpperCase();
+          _bleDeviceMap[mac] = dev;
+          _bleDeviceMap[macUpper] = dev;
+          _bleDeviceMap[mac.toLowerCase()] = dev;
+          _knownBleMacs.add(macUpper);
+
+          String name = dev.platformName.trim();
+          if (name.isEmpty) name = res.advertisementData.advName.trim();
+          if (name.isEmpty) {
+            final shortMac = mac.length >= 5 ? mac.substring(mac.length - 5) : mac;
+            name = "BLE Device ($shortMac)";
           }
-        } else if (status == bc.Device.disconnected) {
-          // Status 0: Remote device disconnected or link dropped
-          if (activeType == ActiveConnectionType.classicSpp) {
-            activeType = ActiveConnectionType.none;
-            connectedMac = null;
-            connectedName = null;
-            lastError = "Bluetooth Classic connection disconnected.";
-            notifyListeners();
-          }
+
+          _registerDiscoveredDevice(RoboticDevice(
+            id: "real-$mac",
+            name: name,
+            macAddress: mac,
+            ipAddress: "",
+            protocol: "BLE 5.2",
+            rssi: res.rssi,
+            isConnected: dev.isConnected,
+            deviceType: _guessDeviceType(name),
+          ));
         }
       });
 
-      _classicDataSub = _classic.onDeviceDataReceived().listen((data) {
-        final text = utf8.decode(data, allowMalformed: true);
-        onDataReceived?.call(text);
-      });
+      // Android-only Classic Bluetooth & Native MethodChannel listeners (Runs once on launch)
+      if (Platform.isAndroid) {
+        _classicDiscoverySub = _classic.onDeviceDiscovered().listen((dev) {
+          final mac = dev.address.trim();
+          if (mac.isEmpty) return;
+
+          String name = dev.name?.trim() ?? "";
+          if (name.isEmpty) {
+            final shortMac = mac.length >= 5 ? mac.substring(mac.length - 5) : mac;
+            name = "HC-05 / BT ($shortMac)";
+          }
+
+          _registerDiscoveredDevice(RoboticDevice(
+            id: "real-$mac",
+            name: name,
+            macAddress: mac,
+            ipAddress: "",
+            protocol: "Bluetooth (Classic)",
+            rssi: -55,
+            isConnected: (activeType == ActiveConnectionType.classicSpp && connectedMac?.toUpperCase() == mac.toUpperCase()),
+            deviceType: _guessDeviceType(name),
+          ));
+        });
+
+        _classicStatusSub = _classic.onDeviceStatusChanged().listen((status) {
+          debugPrint("[Classic Service] onDeviceStatusChanged: status=$status (0=disc, 1=conn-ing, 2=conn-ed)");
+          if (status == bc.Device.connected) {
+            // Status 2: Hardware RFCOMM socket established
+            if (activeType != ActiveConnectionType.classicSpp) {
+              activeType = ActiveConnectionType.classicSpp;
+              notifyListeners();
+            }
+          } else if (status == bc.Device.disconnected) {
+            // Status 0: Remote device disconnected or link dropped
+            handleHardwareDisconnected();
+          }
+        });
+
+        _classicDataSub = _classic.onDeviceDataReceived().listen((data) {
+          final text = utf8.decode(data, allowMalformed: true);
+          onDataReceived?.call(text);
+        });
+
+        // Native Android Bluetooth broadcast listener (finds unbonded Classic bots directly!)
+        _btChannel.setMethodCallHandler((call) async {
+          if (call.method == 'onDeviceFound') {
+            final map = call.arguments as Map<dynamic, dynamic>;
+            final String address = map['address']?.toString().trim() ?? '';
+            if (address.isEmpty) return;
+            final String name = map['name']?.toString().trim() ?? '';
+            final int rssi = (map['rssi'] as num?)?.toInt() ?? -60;
+            final int bondState = (map['bondState'] as num?)?.toInt() ?? 10;
+            _handleNativeBtDeviceDiscovered(address: address, name: name, rssi: rssi, bondState: bondState);
+          } else if (call.method == 'onDeviceDisconnected') {
+            final map = call.arguments as Map<dynamic, dynamic>?;
+            final String address = map?['address']?.toString().trim() ?? '';
+            handleHardwareDisconnected(address: address);
+          } else if (call.method == 'onBondStateChanged') {
+            final map = call.arguments as Map<dynamic, dynamic>;
+            debugPrint("[Native BT] onBondStateChanged: ${map['address']} -> ${map['state']}");
+            getBondedDevices();
+          } else if (call.method == 'onDiscoveryFinished') {
+            debugPrint("[Native BT] Classic inquiry scan finished");
+          }
+        });
+      }
 
       checkLocationService();
     } catch (e) {
       debugPrint("[BLE Service] Init error: $e");
+    }
+  }
+
+  // Unified discovered devices map so feeds never wipe each other out!
+  final Map<String, RoboticDevice> _discoveredMap = {};
+
+  void _registerDiscoveredDevice(RoboticDevice dev) {
+    final macUpper = dev.macAddress.toUpperCase();
+    if (_discoveredMap.containsKey(macUpper)) {
+      final existing = _discoveredMap[macUpper]!;
+      final hasBetterName = dev.name.isNotEmpty && !dev.name.startsWith("Bluetooth") && !dev.name.startsWith("BLE");
+      _discoveredMap[macUpper] = dev.copyWith(
+        name: hasBetterName ? dev.name : existing.name,
+        rssi: dev.rssi != 0 ? dev.rssi : existing.rssi,
+      );
+    } else {
+      _discoveredMap[macUpper] = dev;
+    }
+    realNearbyDevices = _discoveredMap.values.toList()
+      ..sort((a, b) => b.rssi.compareTo(a.rssi));
+    notifyListeners();
+  }
+
+  void _handleNativeBtDeviceDiscovered({
+    required String address,
+    required String name,
+    required int rssi,
+    required int bondState,
+  }) {
+    final mac = address.trim();
+    if (mac.isEmpty) return;
+    final macUpper = mac.toUpperCase();
+
+    String displayName = name.trim();
+    if (displayName.isEmpty) {
+      final shortMac = mac.length >= 5 ? mac.substring(mac.length - 5) : mac;
+      displayName = "HC-05 / BT ($shortMac)";
+    }
+
+    final newDev = RoboticDevice(
+      id: "nearby-$mac",
+      name: displayName,
+      macAddress: mac,
+      ipAddress: "",
+      protocol: "Bluetooth (Classic)",
+      rssi: rssi,
+      isConnected: (activeType == ActiveConnectionType.classicSpp && connectedMac?.toUpperCase() == macUpper),
+      deviceType: _guessDeviceType(displayName),
+    );
+
+    _registerDiscoveredDevice(newDev);
+  }
+
+  void handleHardwareDisconnected({String? address}) {
+    debugPrint("[Native BT] Hardware link disconnected: $address (current=$connectedMac)");
+    if (address == null || address.isEmpty || connectedMac == null || address.toUpperCase() == connectedMac?.toUpperCase()) {
+      activeType = ActiveConnectionType.none;
+      connectedMac = null;
+      connectedName = null;
+      _bleTxChar = null;
+      _bleRxChar = null;
+      lastError = "Robot disconnected.";
+
+      for (int i = 0; i < realNearbyDevices.length; i++) {
+        if (realNearbyDevices[i].isConnected) {
+          realNearbyDevices[i] = realNearbyDevices[i].copyWith(isConnected: false);
+        }
+      }
+      for (int i = 0; i < realBondedDevices.length; i++) {
+        if (realBondedDevices[i].isConnected) {
+          realBondedDevices[i] = realBondedDevices[i].copyWith(isConnected: false);
+        }
+      }
+      notifyListeners();
+    }
+  }
+
+  Future<bool> pairDevice(String mac) async {
+    try {
+      final res = await _btChannel.invokeMethod<bool>('pairDevice', {'address': mac}) ?? false;
+      return res;
+    } catch (e) {
+      debugPrint("[Native BT] pairDevice error: $e");
+      return false;
     }
   }
 
@@ -177,32 +335,34 @@ class RealBluetoothService extends ChangeNotifier {
   Future<List<RoboticDevice>> getBondedDevices() async {
     final Map<String, RoboticDevice> uniqueBonded = {};
 
-    // A. Query Bluetooth Classic paired devices (HC-05, HC-06, etc.)
-    try {
-      final classicList = await _classic.getPairedDevices();
-      for (var dev in classicList) {
-        final mac = dev.address.trim();
-        if (mac.isEmpty) continue;
-        final macUpper = mac.toUpperCase();
-        String name = dev.name?.trim() ?? "";
-        if (name.isEmpty) {
-          final shortMac = mac.length >= 5 ? mac.substring(mac.length - 5) : mac;
-          name = "Paired Device ($shortMac)";
-        }
+    // A. Query Bluetooth Classic paired devices (HC-05, HC-06, etc. - Android only)
+    if (Platform.isAndroid) {
+      try {
+        final classicList = await _classic.getPairedDevices();
+        for (var dev in classicList) {
+          final mac = dev.address.trim();
+          if (mac.isEmpty) continue;
+          final macUpper = mac.toUpperCase();
+          String name = dev.name?.trim() ?? "";
+          if (name.isEmpty) {
+            final shortMac = mac.length >= 5 ? mac.substring(mac.length - 5) : mac;
+            name = "Paired Device ($shortMac)";
+          }
 
-        uniqueBonded[macUpper] = RoboticDevice(
-          id: "bonded-$mac",
-          name: name,
-          macAddress: mac,
-          ipAddress: "",
-          protocol: "Bluetooth (Classic)",
-          rssi: -50,
-          isConnected: (activeType == ActiveConnectionType.classicSpp && connectedMac?.toUpperCase() == macUpper),
-          deviceType: _guessDeviceType(name),
-        );
+          uniqueBonded[macUpper] = RoboticDevice(
+            id: "bonded-$mac",
+            name: name,
+            macAddress: mac,
+            ipAddress: "",
+            protocol: "Bluetooth (Classic)",
+            rssi: -50,
+            isConnected: (activeType == ActiveConnectionType.classicSpp && connectedMac?.toUpperCase() == macUpper),
+            deviceType: _guessDeviceType(name),
+          );
+        }
+      } catch (e) {
+        debugPrint("[Classic Service] getPairedDevices error: $e");
       }
-    } catch (e) {
-      debugPrint("[Classic Service] getPairedDevices error: $e");
     }
 
     // B. Query BLE bonded & system devices
@@ -294,94 +454,44 @@ class RealBluetoothService extends ChangeNotifier {
       if (FlutterBluePlus.isScanningNow) {
         await FlutterBluePlus.stopScan();
       }
-      try {
-        await _classic.stopScan();
-      } catch (_) {}
+      if (Platform.isAndroid) {
+        try {
+          await _classic.stopScan();
+        } catch (_) {}
+      }
 
+      _discoveredMap.clear();
       realNearbyDevices.clear();
       isScanning = true;
       notifyListeners();
 
-      final Map<String, RoboticDevice> unique = {};
-
-      void updateList() {
-        realNearbyDevices = unique.values.toList()
-          ..sort((a, b) => b.rssi.compareTo(a.rssi));
-        notifyListeners();
+      // Launch scans: Native Android inquiry (finds unbonded Classic bots) + FlutterBluePlus (BLE) + Classic plugin
+      if (Platform.isAndroid) {
+        try {
+          await _btChannel.invokeMethod('startDiscovery');
+        } catch (e) {
+          debugPrint("[Native BT] startDiscovery error: $e");
+        }
       }
 
-      // Stream A: BLE Scan
-      _scanSub?.cancel();
-      _scanSub = FlutterBluePlus.scanResults.listen((results) {
-        for (var res in results) {
-          final dev = res.device;
-          final mac = dev.remoteId.str;
-          final macUpper = mac.toUpperCase();
-          _bleDeviceMap[mac] = dev;
-          _bleDeviceMap[macUpper] = dev;
-          _bleDeviceMap[mac.toLowerCase()] = dev;
-          _knownBleMacs.add(macUpper);
-
-          String name = dev.platformName.trim();
-          if (name.isEmpty) name = res.advertisementData.advName.trim();
-          if (name.isEmpty) {
-            final shortMac = mac.length >= 5 ? mac.substring(mac.length - 5) : mac;
-            name = "BLE Device ($shortMac)";
-          }
-
-          unique[mac] = RoboticDevice(
-            id: "real-$mac",
-            name: name,
-            macAddress: mac,
-            ipAddress: "",
-            protocol: "BLE 5.2",
-            rssi: res.rssi,
-            isConnected: dev.isConnected,
-            deviceType: _guessDeviceType(name),
-          );
-        }
-        updateList();
-      });
-
-      // Stream B: Classic Discovery
-      _classicDiscoverySub?.cancel();
-      _classicDiscoverySub = _classic.onDeviceDiscovered().listen((dev) {
-        final mac = dev.address.trim();
-        if (mac.isEmpty) return;
-
-        String name = dev.name?.trim() ?? "";
-        if (name.isEmpty) {
-          final shortMac = mac.length >= 5 ? mac.substring(mac.length - 5) : mac;
-          name = "Classic BT ($shortMac)";
-        }
-
-        if (!unique.containsKey(mac)) {
-          unique[mac] = RoboticDevice(
-            id: "real-$mac",
-            name: name,
-            macAddress: mac,
-            ipAddress: "",
-            protocol: "Bluetooth (Classic)",
-            rssi: -55,
-            isConnected: (activeType == ActiveConnectionType.classicSpp && connectedMac == mac),
-            deviceType: _guessDeviceType(name),
-          );
-          updateList();
-        }
-      });
-
-      // Launch both scans
-      await Future.wait([
+      final List<Future<dynamic>> scanFutures = [
         FlutterBluePlus.startScan(timeout: timeout).catchError((e) {
           debugPrint("[BLE] Scan error: $e");
         }),
-        _classic.startScan().catchError((e) {
-          debugPrint("[Classic] Scan error: $e");
-          return false;
-        }),
-      ]);
+      ];
 
-      // Timer to stop classic after timeout
+      if (Platform.isAndroid) {
+        scanFutures.add(
+          _classic.startScan().catchError((e) {
+            debugPrint("[Classic] Scan error: $e");
+            return false;
+          }),
+        );
+      }
+
+      await Future.wait(scanFutures);
+
+      // Timer to stop scan after timeout
       Future.delayed(timeout, () {
         stopScan();
       });
@@ -394,11 +504,16 @@ class RealBluetoothService extends ChangeNotifier {
   }
 
   Future<void> stopScan() async {
+    if (Platform.isAndroid) {
+      try {
+        await _btChannel.invokeMethod('stopDiscovery');
+      } catch (_) {}
+      try {
+        await _classic.stopScan();
+      } catch (_) {}
+    }
     try {
       await FlutterBluePlus.stopScan();
-    } catch (_) {}
-    try {
-      await _classic.stopScan();
     } catch (_) {}
     isScanning = false;
     notifyListeners();
@@ -492,9 +607,11 @@ class RealBluetoothService extends ChangeNotifier {
 
     // Ensure real Bluetooth permissions are verified before connecting
     await requestPermissions();
-    try {
-      await _classic.initPermissions();
-    } catch (_) {}
+    if (Platform.isAndroid) {
+      try {
+        await _classic.initPermissions();
+      } catch (_) {}
+    }
 
     const String sppUuid = "00001101-0000-1000-8000-00805f9b34fb";
 
@@ -525,12 +642,27 @@ class RealBluetoothService extends ChangeNotifier {
 
     final bool isClassic = forceClassic || !isBle;
 
-    // 1. Try Classic SPP (HC-05, HC-06, Arduino, etc.)
+    // 1. Try Classic SPP (HC-05, HC-06, Arduino, etc. - Android only)
     if (isClassic) {
+      if (Platform.isIOS) {
+        lastError = "${device.name} uses Bluetooth Classic SPP (HC-05/HC-06), which Apple iOS does not support. Please connect via an ESP32 (BLE or Wi-Fi) on iPhone.";
+        notifyListeners();
+        return false;
+      }
+
+      // Check if device is bonded in phone. If not, trigger in-app pairing without sending user to Settings!
+      final isBonded = realBondedDevices.any((b) => b.macAddress.toUpperCase() == macUpper);
+      if (!isBonded) {
+        debugPrint("[Classic SPP] Device $mac is unbonded. Triggering in-app pairing dialog...");
+        await pairDevice(mac);
+        // Short pause to allow Android to show pairing confirmation dialog / bond
+        await Future.delayed(const Duration(milliseconds: 1500));
+      }
+
       debugPrint("[Classic SPP] Initiating RFCOMM connection to $mac with UUID $sppUuid...");
       try {
         final success = await _classic.connect(mac, sppUuid).timeout(
-          const Duration(seconds: 8),
+          const Duration(seconds: 10),
           onTimeout: () => false,
         );
         if (success) {
@@ -542,7 +674,7 @@ class RealBluetoothService extends ChangeNotifier {
           debugPrint("[Classic SPP] Connection successfully established to $mac");
           return true;
         } else {
-          lastError = "Could not establish connection to ${device.name}. Ensure device is powered on and paired in phone Settings.";
+          lastError = "Could not establish connection to ${device.name}. Ensure device is powered on and in range.";
         }
       } catch (e) {
         debugPrint("[Classic SPP] RFCOMM connect error: $e");
@@ -663,35 +795,43 @@ class RealBluetoothService extends ChangeNotifier {
     } catch (e) {
       debugPrint("[Bluetooth Service] sendData exception: $e");
       lastError = "Write error: $e";
-      if (activeType == ActiveConnectionType.classicSpp) {
-        activeType = ActiveConnectionType.none;
-        connectedMac = null;
-        connectedName = null;
-        notifyListeners();
-      }
+      // Do not force-disconnect on transmission hiccup! Only disconnect when user presses Disconnect or hardware drops
       return false;
     }
   }
 
   Future<void> disconnect() async {
-    try {
-      if (activeType == ActiveConnectionType.classicSpp) {
-        await _classic.disconnect();
+    activeType = ActiveConnectionType.none;
+    connectedMac = null;
+    connectedName = null;
+    _bleTxChar = null;
+    _bleRxChar = null;
+
+    for (int i = 0; i < realNearbyDevices.length; i++) {
+      if (realNearbyDevices[i].isConnected) {
+        realNearbyDevices[i] = realNearbyDevices[i].copyWith(isConnected: false);
       }
+    }
+    for (int i = 0; i < realBondedDevices.length; i++) {
+      if (realBondedDevices[i].isConnected) {
+        realBondedDevices[i] = realBondedDevices[i].copyWith(isConnected: false);
+      }
+    }
+    notifyListeners();
+
+    try {
+      await _classic.disconnect();
+    } catch (_) {}
+
+    try {
       if (connectedBleDevice != null) {
         await _bleConnSub?.cancel();
         _bleConnSub = null;
         await _bleDataSub?.cancel();
         _bleDataSub = null;
-        _bleTxChar = null;
-        _bleRxChar = null;
         await connectedBleDevice!.disconnect();
         connectedBleDevice = null;
       }
-      activeType = ActiveConnectionType.none;
-      connectedMac = null;
-      connectedName = null;
-      notifyListeners();
     } catch (e) {
       debugPrint("[BLE Service] Disconnect error: $e");
     }

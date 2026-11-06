@@ -165,9 +165,21 @@ class RobotState extends ChangeNotifier {
       }
     } else {
       // Bluetooth hardware is disconnected
-      if (connectionStatus == ConnectionStatus.connected) {
+      if (connectionStatus == ConnectionStatus.connected && !currentDevice.protocol.contains("Wi-Fi")) {
         connectionStatus = ConnectionStatus.disconnected;
-        currentDevice = currentDevice.copyWith(isConnected: false);
+        currentDevice = const RoboticDevice(
+          id: "none",
+          name: "No Device Connected",
+          macAddress: "--:--:--:--:--:--",
+          ipAddress: "",
+          protocol: "None",
+          isConnected: false,
+          rssi: 0,
+          batteryVoltage: 0.0,
+          pingMs: 0,
+          deviceType: "Rover",
+        );
+        targetDevice = targetDevice?.copyWith(isConnected: false);
         final err = bleService.lastError ?? "Bluetooth connection disconnected.";
         addTerminalLog("[SYS] $err", LogType.error);
       }
@@ -370,10 +382,30 @@ class RobotState extends ChangeNotifier {
 
   void disconnectDevice() {
     final dev = currentDevice;
+    connectionStatus = ConnectionStatus.disconnected;
+    currentDevice = const RoboticDevice(
+      id: "none",
+      name: "No Device Connected",
+      macAddress: "--:--:--:--:--:--",
+      ipAddress: "",
+      protocol: "None",
+      isConnected: false,
+      rssi: 0,
+      batteryVoltage: 0.0,
+      pingMs: 0,
+      deviceType: "Rover",
+    );
+    targetDevice = targetDevice?.copyWith(isConnected: false);
+
+    for (int i = 0; i < nearbyDiscoveredDevices.length; i++) {
+      if (nearbyDiscoveredDevices[i].isConnected) {
+        nearbyDiscoveredDevices[i] = nearbyDiscoveredDevices[i].copyWith(isConnected: false);
+      }
+    }
+
     wifiService.disconnect();
     bleService.disconnect();
-    connectionStatus = ConnectionStatus.disconnected;
-    currentDevice = dev.copyWith(isConnected: false);
+
     addTerminalLog("[SYS] Disconnected from ${dev.name}", LogType.system);
     notifyListeners();
   }

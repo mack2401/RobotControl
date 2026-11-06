@@ -247,53 +247,94 @@ void loop() {
     // 103. ESP32-S3 LiteWing Quadcopter UDP Flight Controller
     FirmwareSnippet(
       id: 103,
-      title: "🛸 LiteWing ESP32-S3 Quadcopter UDP Flight Controller",
+      title: "🛸 LiteWing ESP32-S3 Quadcopter UDP Flight Controller & Motor Calibration",
       badge: "Drone Core",
       category: "comm",
-      description: "Circuit Digest LiteWing & ESP-Drone flight firmware. Receives 30Hz CRTP UDP commander packets on port 2390 with watchdog motor safety cutoff.",
+      description: "Circuit Digest LiteWing & ESP-Drone flight firmware. Supports 30Hz CRTP UDP commander frames, real-time 4-motor precision calibration multipliers (M1-M4), live motor bench testing, and bidirectional telemetry.",
       icon: Icons.flight,
       code: '''#include <WiFi.h>
 #include <WiFiUdp.h>
+#include <Preferences.h>
 
 // --- LiteWing Wi-Fi SoftAP Configuration ---
 const char* ap_ssid = "LiteWing_AP";
 const char* ap_pass = "12345678";
-const IPAddress local_IP(192, 168, 43, 42); // Default LiteWing IP
+const IPAddress local_IP(192, 168, 43, 42); // Default LiteWing AP IP
 const IPAddress gateway(192, 168, 43, 1);
 const IPAddress subnet(255, 255, 255, 0);
 
 WiFiUDP udp;
 const unsigned int localUdpPort = 2390; // Default CRTP UDP Port
 
-// --- Motor PWM Pins (LiteWing Coreless / ESC Driver) ---
-const int MOTOR_FL = 4;  // Front-Left (CW)
-const int MOTOR_FR = 5;  // Front-Right (CCW)
-const int MOTOR_RL = 6;  // Rear-Left (CCW)
-const int MOTOR_RR = 7;  // Rear-Right (CW)
+// --- 4-Motor PWM Pins (LiteWing Coreless / FET Driver) ---
+const int MOTOR_FL = 4;  // M1: Front-Left  (CW)
+const int MOTOR_FR = 5;  // M2: Front-Right (CCW)
+const int MOTOR_RL = 6;  // M3: Rear-Left   (CCW)
+const int MOTOR_RR = 7;  // M4: Rear-Right  (CW)
 
-// PWM Properties (500Hz - 32kHz depending on FET driver)
+// PWM Properties (16kHz for silent, smooth coreless motor drive)
 const int pwmFreq = 16000;
 const int pwmResolution = 10; // 0 - 1023
 
-// Flight Watchdog Timer (Cut motors if signal lost > 500ms)
+// --- Real-World 4-Motor Precision Calibration Parameters ---
+Preferences prefs;
+float calFL = 1.00f; // Multiplier (0.70 to 1.30)
+float calFR = 1.00f;
+float calRL = 1.00f;
+float calRR = 1.00f;
+int minIdlePwm = 80;  // Minimum spin speed when armed
+int maxOutputPwm = 1023; // Headroom cap
+
+// Flight & Safety Watchdog
 unsigned long lastPacketTime = 0;
-const unsigned long WATCHDOG_TIMEOUT_MS = 500;
+const unsigned long WATCHDOG_TIMEOUT_MS = 600;
 bool isArmed = false;
+bool isBenchTesting = false;
+
+// Current Motor Outputs (0 - 1023)
+int outFL = 0, outFR = 0, outRL = 0, outRR = 0;
 
 // Packet buffer
-uint8_t packetBuffer[128];
+uint8_t packetBuffer[256];
+
+void loadCalibrations() {
+  prefs.begin("litewing", true);
+  calFL = prefs.getFloat("calFL", 1.00f);
+  calFR = prefs.getFloat("calFR", 1.00f);
+  calRL = prefs.getFloat("calRL", 1.00f);
+  calRR = prefs.getFloat("calRR", 1.00f);
+  minIdlePwm = prefs.getInt("idlePwm", 80);
+  maxOutputPwm = prefs.getInt("maxPwm", 1023);
+  prefs.end();
+  Serial.printf("Calibrations Loaded: FL:%.2f FR:%.2f RL:%.2f RR:%.2f Idle:%d\\n",
+                calFL, calFR, calRL, calRR, minIdlePwm);
+}
+
+void saveCalibrations() {
+  prefs.begin("litewing", false);
+  prefs.putFloat("calFL", calFL);
+  prefs.putFloat("calFR", calFR);
+  prefs.putFloat("calRL", calRL);
+  prefs.putFloat("calRR", calRR);
+  prefs.putInt("idlePwm", minIdlePwm);
+  prefs.putInt("maxPwm", maxOutputPwm);
+  prefs.end();
+}
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);
-  Serial.println("\\n--- LiteWing ESP32-S3 Quadcopter Starting ---");
+  delay(500);
+  Serial.println("\\n--- LiteWing ESP32-S3 Flight Controller Starting ---");
 
-  // Configure Motor PWM Channels
+  // Configure 4 Motor PWM Channels
   ledcAttach(MOTOR_FL, pwmFreq, pwmResolution);
   ledcAttach(MOTOR_FR, pwmFreq, pwmResolution);
   ledcAttach(MOTOR_RL, pwmFreq, pwmResolution);
   ledcAttach(MOTOR_RR, pwmFreq, pwmResolution);
   cutAllMotors();
+
+  // Load persistent motor calibrations from NVS flash
+  loadCalibrations();
 
   // Start Access Point
   WiFi.mode(WIFI_AP);
@@ -310,16 +351,27 @@ void setup() {
 }
 
 void cutAllMotors() {
+  outFL = outFR = outRL = outRR = 0;
   ledcWrite(MOTOR_FL, 0);
   ledcWrite(MOTOR_FR, 0);
   ledcWrite(MOTOR_RL, 0);
   ledcWrite(MOTOR_RR, 0);
 }
 
+void applyMotorOutputs(int fl, int fr, int rl, int rr) {
+  outFL = constrain(fl, 0, maxOutputPwm);
+  outFR = constrain(fr, 0, maxOutputPwm);
+  outRL = constrain(rl, 0, maxOutputPwm);
+  outRR = constrain(rr, 0, maxOutputPwm);
+
+  ledcWrite(MOTOR_FL, outFL);
+  ledcWrite(MOTOR_FR, outFR);
+  ledcWrite(MOTOR_RL, outRL);
+  ledcWrite(MOTOR_RR, outRR);
+}
+
 void parseCrtpCommander(uint8_t* buf, int len) {
-  // CRTP Commander Packet: [0x30, roll(f32), pitch(f32), yaw(f32), thrust(u16)]
-  if (len < 15) return;
-  if (buf[0] != 0x30) return; // Port 3, Channel 0
+  if (len < 15 || buf[0] != 0x30) return; // CRTP Commander (Port 3, Chan 0)
 
   float roll, pitch, yawRate;
   uint16_t thrust;
@@ -329,41 +381,78 @@ void parseCrtpCommander(uint8_t* buf, int len) {
   memcpy(&yawRate, &buf[9], 4);
   memcpy(&thrust, &buf[13], 2);
 
-  // If thrust > 0, consider armed
-  if (thrust > 1000) {
+  if (thrust > 1200) {
     isArmed = true;
   } else {
     isArmed = false;
   }
 
-  // Basic motor mixing algorithm
-  // Map 0-65535 thrust to 0-1023 PWM
-  int basePwm = map(thrust, 0, 65535, 0, 1023);
-  int rAdj = (int)(roll * 5.0f);
-  int pAdj = (int)(pitch * 5.0f);
-  int yAdj = (int)(yawRate * 3.0f);
+  if (isArmed) {
+    // Map 0-65535 thrust to 0-1023 PWM
+    int basePwm = map(thrust, 0, 65535, 0, 1023);
+    int rAdj = (int)(roll * 5.5f);
+    int pAdj = (int)(pitch * 5.5f);
+    int yAdj = (int)(yawRate * 3.5f);
 
-  if (isArmed && basePwm > 50) {
-    int mFL = constrain(basePwm - pAdj + rAdj + yAdj, 0, 1023);
-    int mFR = constrain(basePwm - pAdj - rAdj - yAdj, 0, 1023);
-    int mRL = constrain(basePwm + pAdj + rAdj - yAdj, 0, 1023);
-    int mRR = constrain(basePwm + pAdj - rAdj + yAdj, 0, 1023);
+    // LiteWing Quad-X Motor Mixing + Individual 4-Motor Calibration Multipliers
+    int rawFL = (int)((basePwm - pAdj + rAdj + yAdj) * calFL);
+    int rawFR = (int)((basePwm - pAdj - rAdj - yAdj) * calFR);
+    int rawRL = (int)((basePwm + pAdj + rAdj - yAdj) * calRL);
+    int rawRR = (int)((basePwm + pAdj - rAdj + yAdj) * calRR);
 
-    ledcWrite(MOTOR_FL, mFL);
-    ledcWrite(MOTOR_FR, mFR);
-    ledcWrite(MOTOR_RL, mRL);
-    ledcWrite(MOTOR_RR, mRR);
+    // Clamp within min idle spin threshold and max limit
+    int mFL = max(rawFL, minIdlePwm);
+    int mFR = max(rawFR, minIdlePwm);
+    int mRL = max(rawRL, minIdlePwm);
+    int mRR = max(rawRR, minIdlePwm);
+
+    applyMotorOutputs(mFL, mFR, mRL, mRR);
   } else {
     cutAllMotors();
   }
 }
 
-void parseAsciiCommand(char* str) {
+void parseAsciiCommand(char* str, IPAddress remoteIp, uint16_t remotePort) {
   if (strncmp(str, "CMD:ARM", 7) == 0) {
     isArmed = true;
   } else if (strncmp(str, "CMD:DISARM", 10) == 0 || strncmp(str, "CMD:EMERGENCY", 13) == 0) {
     isArmed = false;
+    isBenchTesting = false;
     cutAllMotors();
+  } else if (strncmp(str, "CMD:MOTOR_CAL:", 14) == 0) {
+    // Format: CMD:MOTOR_CAL:<fl_pct>,<fr_pct>,<rl_pct>,<rr_pct>,<idle>,<max>
+    int fl, fr, rl, rr, idle, maxP;
+    if (sscanf(str + 14, "%d,%d,%d,%d,%d,%d", &fl, &fr, &rl, &rr, &idle, &maxP) >= 4) {
+      calFL = fl / 100.0f;
+      calFR = fr / 100.0f;
+      calRL = rl / 100.0f;
+      calRR = rr / 100.0f;
+      if (idle > 0) minIdlePwm = idle;
+      if (maxP > 0) maxOutputPwm = maxP;
+      saveCalibrations();
+      Serial.printf("Updated Calibrations: FL:%.2f FR:%.2f RL:%.2f RR:%.2f\\n",
+                    calFL, calFR, calRL, calRR);
+    }
+  } else if (strncmp(str, "CMD:MOTOR_TEST:", 15) == 0) {
+    // Format: CMD:MOTOR_TEST:<motorIndex>,<pwm>
+    int mIdx, pwm;
+    if (sscanf(str + 15, "%d,%d", &mIdx, &pwm) == 2) {
+      isBenchTesting = (pwm > 0);
+      pwm = constrain(pwm, 0, maxOutputPwm);
+      if (mIdx == 0) applyMotorOutputs(pwm, pwm, pwm, pwm);
+      else if (mIdx == 1) applyMotorOutputs(pwm, 0, 0, 0);
+      else if (mIdx == 2) applyMotorOutputs(0, pwm, 0, 0);
+      else if (mIdx == 3) applyMotorOutputs(0, 0, pwm, 0);
+      else if (mIdx == 4) applyMotorOutputs(0, 0, 0, pwm);
+    }
+  } else if (strncmp(str, "CMD:PING", 8) == 0) {
+    // Send PONG heartbeat reply with battery and 4-motor outputs
+    char resp[128];
+    snprintf(resp, sizeof(resp), "{\\"bat\\":4.12,\\"m\\":[%d,%d,%d,%d],\\"status\\":\\"OK\\"}\\n",
+             outFL, outFR, outRL, outRR);
+    udp.beginPacket(remoteIp, remotePort);
+    udp.write((const uint8_t*)resp, strlen(resp));
+    udp.endPacket();
   }
 }
 
@@ -371,19 +460,22 @@ void loop() {
   int packetSize = udp.parsePacket();
   if (packetSize > 0) {
     lastPacketTime = millis();
+    IPAddress remoteIp = udp.remoteIP();
+    uint16_t remotePort = udp.remotePort();
+
     int len = udp.read(packetBuffer, sizeof(packetBuffer) - 1);
     if (len > 0) {
       if (packetBuffer[0] == 0x30) {
         parseCrtpCommander(packetBuffer, len);
       } else {
         packetBuffer[len] = '\\0';
-        parseAsciiCommand((char*)packetBuffer);
+        parseAsciiCommand((char*)packetBuffer, remoteIp, remotePort);
       }
     }
   }
 
-  // SAFETY WATCHDOG: If no packets received in 500ms, kill motors!
-  if (millis() - lastPacketTime > WATCHDOG_TIMEOUT_MS) {
+  // SAFETY WATCHDOG: If no packets received within timeout, kill motors!
+  if (!isBenchTesting && (millis() - lastPacketTime > WATCHDOG_TIMEOUT_MS)) {
     if (isArmed) {
       cutAllMotors();
       isArmed = false;
@@ -392,7 +484,7 @@ void loop() {
 
   delay(2);
 }''',
-      note: "LiteWing Drone: Dual Mode 2 stick flight. Sends Bitcraze CRTP packets over UDP port 2390 directly to the ESP32-S3 access point.",
+      note: "LiteWing Drone: Dual Mode 2 stick flight with full 4-motor calibration support, NVS flash persistence, and bench testing over UDP port 2390.",
     ),
 
     // 0. Full Master Sketch (HC-05 + Arduino)

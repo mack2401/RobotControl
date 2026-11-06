@@ -45,5 +45,21 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>This app requires Bluetooth to discover and communicate with your robot.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>This app requires Bluetooth peripheral access to control your robot.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app needs access to your local network to send control commands to ESP32 and ESP8266 robots over Wi-Fi.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to the microphone for real-time voice control commands.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>This app uses speech recognition to convert your spoken voice commands into robot actions.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app requires location permission to discover nearby Bluetooth and Wi-Fi devices.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+	</array>
 </dict>
 </plist>

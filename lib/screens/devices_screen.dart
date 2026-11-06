@@ -22,7 +22,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
   final TextEditingController _lanIpController = TextEditingController(text: "192.168.1.100");
   final TextEditingController _lanPortController = TextEditingController(text: "80");
   bool _filterOnlyEspWifi = true; // Toggle: show only ESP robot Wi-Fi vs all Wi-Fi
-  bool _filterOnlyRobotBt = true; // Toggle: show only Robot Bluetooth modules vs all Bluetooth devices
+  bool _filterOnlyRobotBt = false; // Default false: show all detected nearby Bluetooth devices without hiding unbonded bots!
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
   Color get cardBg => isDark ? const Color(0xFF1E293B) : Colors.white;
@@ -36,6 +36,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
   void initState() {
     super.initState();
     state.addListener(_onStateChanged);
+    state.bleService.addListener(_onStateChanged);
     state.wifiService.addListener(_onStateChanged);
     _pulseController = AnimationController(
       vsync: this,
@@ -45,6 +46,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
     // Prompt real permissions and fetch bonded / Wi-Fi devices on initial entry
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       state.bleService.getBondedDevices();
+      state.startScanning(); // Auto-scan for nearby unbonded Bluetooth devices
       final hasPerm = await state.wifiService.checkPermissions();
       if (!hasPerm) {
         await state.wifiService.requestPermissions();
@@ -72,6 +74,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
     _lanIpController.dispose();
     _lanPortController.dispose();
     state.removeListener(_onStateChanged);
+    state.bleService.removeListener(_onStateChanged);
     state.wifiService.removeListener(_onStateChanged);
     super.dispose();
   }
@@ -246,9 +249,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                     child: CircularProgressIndicator(strokeWidth: 2.2, color: Color(0xFF0284C7)),
                   )
                 : const Icon(Icons.refresh, color: Color(0xFF0284C7)),
-            onPressed: isScanning
-                ? null
-                : () => isWifi ? state.wifiService.scanRealWifiNetworks() : state.startScanning(),
+            onPressed: () => isWifi ? state.wifiService.scanRealWifiNetworks() : state.startScanning(),
           ),
           const SizedBox(width: 8),
         ],
@@ -331,7 +332,11 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           ),
           Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _selectedTransportTab = 1),
+              onTap: () {
+                setState(() => _selectedTransportTab = 1);
+                state.activeProtocol = "Bluetooth (Classic)";
+                state.startScanning();
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 9),
                 decoration: BoxDecoration(
@@ -404,16 +409,16 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
               const SizedBox(height: 24),
             ],
 
-            // Discovery Guide & Tips Card
-            _buildDiscoveryTipsCard(),
-            const SizedBox(height: 20),
-
-            // 3. Paired / Saved Devices from Mobile Phone
-            _buildPairedDevicesSection(),
+            // 3. Nearby Real-World Discovered Devices (Live Scanner)
+            _buildAvailableDiscoveredSection(),
             const SizedBox(height: 24),
 
-            // 4. Available Real-World Discovered Devices
-            _buildAvailableDiscoveredSection(),
+            // 4. Paired / Saved Devices from Mobile Phone
+            _buildPairedDevicesSection(),
+            const SizedBox(height: 20),
+
+            // Discovery Guide & Tips Card
+            _buildDiscoveryTipsCard(),
           ],
         ),
       ),
@@ -2293,18 +2298,18 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
           ),
           const SizedBox(height: 6),
           Text(
-            "• Scanning for another phone/laptop? Open Settings → Bluetooth on that device. Android & iPhone only broadcast their Bluetooth signal while their Bluetooth settings screen is open.",
+            "• Scanning for Arduino / HC-05 / ESP32? Ensure its power LED is blinking. It will appear directly under Nearby Devices without opening phone settings.",
             style: TextStyle(fontSize: 11, color: textSecondary),
           ),
           const SizedBox(height: 4),
           Text(
-            "• Scanning for Arduino / HC-05? Ensure its red LED is blinking rapidly (ready to pair), or pair it once in phone Bluetooth settings with PIN 1234.",
-            style: TextStyle(fontSize: 11, color: textSecondary),
+            "• Direct Connection: Simply tap 'Connect' on any nearby bot. The app will pair and connect directly!",
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF0284C7)),
           ),
           const SizedBox(height: 4),
           Text(
-            "• Ensure Location (GPS) is turned ON in your phone's notification bar.",
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textPrimary),
+            "• Ensure Location (GPS) and Bluetooth are turned ON in your phone's notification bar.",
+            style: TextStyle(fontSize: 11, color: textSecondary),
           ),
         ],
       ),
@@ -2421,7 +2426,10 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    onPressed: () => state.disconnectDevice(),
+                    onPressed: () {
+                      state.disconnectDevice();
+                      if (mounted) setState(() {});
+                    },
                     child: const Text("Disconnect", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
                 ],
@@ -2690,6 +2698,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                           : () {
                               if (isLiveConnected) {
                                 state.disconnectDevice();
+                                if (mounted) setState(() {});
                               } else {
                                 _handleConnect(item);
                               }
@@ -2715,7 +2724,9 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
   }
 
   Widget _buildAvailableDiscoveredSection() {
-    final discovered = state.nearbyDiscoveredDevices;
+    final discovered = state.bleService.realNearbyDevices.isNotEmpty
+        ? state.bleService.realNearbyDevices
+        : state.nearbyDiscoveredDevices;
     final filteredDiscovered = _filterOnlyRobotBt
         ? discovered.where((d) => d.isRobotDevice || (state.currentDevice.id == d.id && state.currentDevice.isConnected)).toList()
         : discovered;
@@ -2791,7 +2802,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                       minimumSize: const Size(60, 30),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    onPressed: state.isScanning ? null : () => state.startScanning(),
+                    onPressed: () => state.startScanning(),
                     icon: const Icon(Icons.search, size: 14),
                     label: const Text("Scan", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
@@ -2936,6 +2947,7 @@ class _DevicesScreenState extends State<DevicesScreen> with SingleTickerProvider
                           : () {
                               if (isConnected) {
                                 state.disconnectDevice();
+                                if (mounted) setState(() {});
                               } else {
                                 _handleConnect(dev);
                               }

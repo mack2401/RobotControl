@@ -15,6 +15,7 @@ import 'esp32_cam_screen.dart';
 import 'robotic_arm_screen.dart';
 import 'gyro_control_screen.dart';
 import 'litewing_drone_screen.dart';
+import '../core/drone/litewing_service.dart';
 import 'settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -228,14 +229,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
         target.name.toLowerCase().contains("robot");
 
     if (isWifi) {
-      // 1. Check if phone is already connected to an ESP Wi-Fi AP
+      // 1. Check if phone is already connected to an ESP or LiteWing Wi-Fi AP
       final phoneWifi = await state.wifiService.refreshConnectedWifi();
       if (phoneWifi != null &&
           (phoneWifi.isEspHotspot ||
+              phoneWifi.ssid.toLowerCase().contains("litewing") ||
+              phoneWifi.ssid.toLowerCase().contains("drone") ||
               phoneWifi.ssid.toLowerCase().contains("robot") ||
               phoneWifi.ssid.toLowerCase().contains("esp") ||
               phoneWifi.ssid.toLowerCase().contains("ibots") ||
-              phoneWifi.ip.startsWith("192.168.4."))) {
+              phoneWifi.ip.startsWith("192.168.4.") ||
+              phoneWifi.ip.startsWith("192.168.43."))) {
+        final isDrone = phoneWifi.ssid.toLowerCase().contains("litewing") ||
+            phoneWifi.ssid.toLowerCase().contains("drone") ||
+            phoneWifi.ip.startsWith("192.168.43.");
+        if (isDrone) {
+          final droneIp = (phoneWifi.gateway.isNotEmpty && phoneWifi.gateway != "0.0.0.0")
+              ? phoneWifi.gateway
+              : "192.168.43.42";
+          _showToast("Linking to ${phoneWifi.ssid} ($droneIp:2390)...");
+          final ok = await LiteWingService().connectDrone(host: droneIp, port: 2390);
+          if (ok) {
+            _showToast("Connected to LiteWing Drone ($droneIp)!");
+          } else {
+            _showToast("Could not reach LiteWing Drone.");
+          }
+          return;
+        }
+
         _showToast("Linking to ${phoneWifi.ssid} (192.168.4.1)...");
         await state.wifiService.bindProcessToWifi();
         final ok = await state.connectWifi(host: "192.168.4.1", mode: WifiMode.softAp, name: phoneWifi.ssid);
